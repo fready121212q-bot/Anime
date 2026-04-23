@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Gold & Silver Monsters from Left</title>
+  <title>Runner Game — Gold & Silver Monsters (Full Logic)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -148,14 +148,14 @@
 <script>
 let player;
 let enemies;
-let specialMonsters; // группа для золотых и серебряных монстров
+let specialEnemies; // золотые и серебряные монстры (слева направо)
 let isDead = false;
 let deathTimer;
 let lives = 3;
 let hearts = [];
 let isPaused = false;
 let enemiesSpeed = -200;
-let specialMonstersSpeed = 180; // движутся направо
+let specialEnemiesSpeed = 180; // движутся направо
 let lastDirection = 'right';
 let isCrouching = false;
 let enemiesStopped = false;
@@ -212,8 +212,6 @@ function preload() {
   this.load.image('enemy2', 'enemy2.png');
   this.load.image('enemy3', 'enemy3.png');
   this.load.image('heart', 'heart.png');
-  this.load.image('goldMonster', 'enemy.png'); // используем тот же спрайт, но с золотым tint
-  this.load.image('silverMonster', 'enemy.png');
   this.load.audio('bgMusic', 'music.mp3');
 }
 
@@ -268,9 +266,9 @@ function create() {
   this.input.keyboard.on('keydown-W', () => { if (!isDead && !showMenu) toggleWeather.call(this); });
 
   enemies = this.physics.add.group({ allowGravity: false });
-  specialMonsters = this.physics.add.group({ allowGravity: false });
+  specialEnemies = this.physics.add.group({ allowGravity: false });
 
-  // Столкновение с обычными врагами
+  // Столкновение с обычными врагами (красные/фиолетовые)
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     const enemyType = enemy.getData('type');
@@ -283,19 +281,39 @@ function create() {
     }
   });
 
-  // Столкновение с золотыми/серебряными монстрами - приносят очки
-  this.physics.add.overlap(player, specialMonsters, (playerObj, monster) => {
+  // Столкновение с золотыми и серебряными монстрами (такая же логика + очки)
+  this.physics.add.overlap(player, specialEnemies, (playerObj, monster) => {
     if (isDead || isPaused || showMenu) return;
-    const monsterType = monster.getData('type');
-    if (monsterType === 'gold') {
-      score += 10;
-    } else if (monsterType === 'silver') {
-      score += 5;
-    }
-    updateScoreDisplay.call(this);
+    const monsterData = monster.getData('type');
+    const monsterHeight = monsterData === 'goldLow' || monsterData === 'silverLow' ? 'low' : 'high';
     
-    // Эффект вспышки и звука (визуально)
-    this.cameras.main.flash(100, 255, 215, 0);
+    let survived = false;
+    if (monsterHeight === 'low') {
+      // Низкий монстр - нужно прыгать
+      if (player.body.blocked.down) {
+        playerHit.call(this);
+      } else {
+        survived = true;
+      }
+    } else {
+      // Высокий монстр - нужно приседать
+      if (!isCrouching) {
+        playerHit.call(this);
+      } else {
+        survived = true;
+      }
+    }
+    
+    if (survived) {
+      // Начисляем очки
+      if (monsterData === 'goldLow' || monsterData === 'goldHigh') {
+        score += 10;
+      } else if (monsterData === 'silverLow' || monsterData === 'silverHigh') {
+        score += 5;
+      }
+      updateScoreDisplay.call(this);
+      this.cameras.main.flash(100, 255, 215, 0);
+    }
     monster.destroy();
   });
 
@@ -328,28 +346,47 @@ function create() {
     callbackScope: this
   });
 
-  // Генерация золотых и серебряных монстров (слева направо)
+  // Генерация золотых и серебряных монстров (слева направо) с той же логикой
   this.time.addEvent({
-    delay: 3000,
+    delay: 2500,
     loop: true,
     callback: () => {
       if (isDead || isPaused || showMenu) return;
       
       // Случайный тип: золотой или серебряный
       const isGold = Math.random() > 0.5;
-      const monsterType = isGold ? 'gold' : 'silver';
-      const monsterY = this.groundY + 25; // на уровне земли
-      const tintColor = isGold ? 0xffd700 : 0xc0c0c0;
+      // Случайная высота: низкий (нужно прыгать) или высокий (нужно приседать)
+      const isLow = Math.random() > 0.5;
       
-      let monster = specialMonsters.create(-50, monsterY, 'goldMonster');
-      monster.setVelocityX(specialMonstersSpeed);
-      monster.setScale(0.25);
-      monster.body.setSize(180, 180, -35, -35);
+      let monsterType, monsterY, enemyWidth, enemyHeight, offsetX, offsetY, tintColor, points;
+      
+      if (isLow) {
+        monsterY = this.groundY + 48;
+        enemyWidth = 320; enemyHeight = 320;
+        offsetX = -35; offsetY = -35;
+        monsterType = isGold ? 'goldLow' : 'silverLow';
+        points = isGold ? 10 : 5;
+      } else {
+        monsterY = this.groundY - 15;
+        enemyWidth = 180; enemyHeight = 180;
+        offsetX = -45; offsetY = -45;
+        monsterType = isGold ? 'goldHigh' : 'silverHigh';
+        points = isGold ? 10 : 5;
+      }
+      
+      tintColor = isGold ? 0xffd700 : 0xc0c0c0;
+      
+      let monster = specialEnemies.create(-50, monsterY, 'enemy');
+      if (!enemiesStopped) monster.setVelocityX(specialEnemiesSpeed);
+      else monster.setVelocityX(0);
+      monster.setScale(0.2);
+      monster.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
       monster.play('enemyAnim');
       monster.setData('type', monsterType);
       monster.setTint(tintColor);
+      monster.setData('points', points);
       
-      // Отражение спрайта по горизонтали (смотрит направо)
+      // Отражение спрайта (смотрит направо)
       monster.setFlipX(true);
     },
     callbackScope: this
@@ -396,10 +433,10 @@ function toggleEnemiesStop() {
       else enemy.body.setVelocityX(enemiesSpeed);
     }
   });
-  specialMonsters.children.iterate(function (monster) {
+  specialEnemies.children.iterate(function (monster) {
     if (monster && monster.body) {
       if (enemiesStopped) monster.body.setVelocityX(0);
-      else monster.body.setVelocityX(specialMonstersSpeed);
+      else monster.body.setVelocityX(specialEnemiesSpeed);
     }
   });
 }
@@ -486,7 +523,7 @@ function playerHit() {
   } else {
     isDead = true; player.setTint(0xff0000); player.setVelocityX(-300); player.setVelocityY(-200);
     enemies.children.iterate(enemy => { if (enemy) enemy.destroy(); });
-    specialMonsters.children.iterate(monster => { if (monster) monster.destroy(); });
+    specialEnemies.children.iterate(monster => { if (monster) monster.destroy(); });
     this.time.delayedCall(1000, () => {
       isDead = false; player.clearTint(); player.setVelocityX(0);
       this.tweens.add({ targets: player, alpha: 0.5, duration: 100, yoyo: true, repeat: 5, onComplete: () => { player.alpha = 1; } });
@@ -598,7 +635,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК (от красных)\n↓ - ПРИСЕДАНИЕ (от фиол)\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nВРАГИ:\n🔴 КРАСНЫЕ (земля) - ПРЫГАЙ ↑\n🟣 ФИОЛЕТОВЫЕ (голова) - ПРИСЕДАЙ ↓\n✨ ЗОЛОТЫЕ +10 очков\n⚪ СЕРЕБРЯНЫЕ +5 очков\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ\nНажмите ESC для выхода');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК (от красных/золотых низких)\n↓ - ПРИСЕДАНИЕ (от фиолетовых/золотых высоких)\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nВРАГИ:\n🔴 КРАСНЫЕ/ЗОЛОТЫЕ (земля) - ПРЫГАЙ ↑ (+очки за золото)\n🟣 ФИОЛЕТОВЫЕ/СЕРЕБРЯНЫЕ (голова) - ПРИСЕДАЙ ↓ (+очки)\n✨ ЗОЛОТЫЕ +10 очков\n⚪ СЕРЕБРЯНЫЕ +5 очков\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ\nНажмите ESC для выхода');
     return;
   } else menuText.setVisible(false);
 
@@ -634,7 +671,7 @@ function update() {
   if (isCrouching) {
     player.setVelocityX(0);
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
-    specialMonsters.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
+    specialEnemies.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
     return;
   }
 
@@ -688,7 +725,7 @@ function update() {
   }
 
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
-  specialMonsters.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
+  specialEnemies.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
 }
 </script>
 </body>
