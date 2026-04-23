@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Полная версия с вибрацией</title>
+  <title>Runner Game — Золотой вихрь смерти</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -167,7 +167,6 @@
   </div>
 </div>
 <script>
-// Phaser Game
 const config = {
   type: Phaser.AUTO,
   scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 800, height: 400 },
@@ -180,13 +179,13 @@ let player, enemies, specialEnemies, bonuses;
 let isDead = false, lives = 3, hearts = [], isPaused = false, enemiesSpeed = -200, specialEnemiesSpeed = 180;
 let lastDirection = 'right', isCrouching = false, enemiesStopped = false, showMenu = false, menuText;
 let backgroundMusic = null, isMuted = false, currentVolume = 0.5, score = 0, scoreText, scoreFrame;
-let doubleJumpActive = false, canDoubleJump = false, doubleJumpTimer = null, bonusSpawnTimer = null;
+let doubleJumpActive = false, canDoubleJump = false, doubleJumpTimer = null;
 let bonusTimerGraphic = null, bonusIcon = null, bonusStartTime = 0, BONUS_DURATION = 15000;
 let invincibleTimer = null, isInvincible = false;
 let rainDrops = [], rainStreaks = [], lightningFlash, lightningTimer, currentWeather = 'rain';
 let dustParticles, footprints = [], footprintDelay = 0;
 let touchLeft = false, touchRight = false, jumpCooldown = false, touchCrouchActive = false;
-let starsArray = [], isRespawning = false;
+let deathSpiralStars = [], isRespawning = false;
 
 function preload() {
   this.load.image('bg', 'bg.png');
@@ -204,11 +203,11 @@ function preload() {
 }
 
 function create() {
-  isDead = false; lives = 3; score = 0; isPaused = false; lastDirection = 'right';
+  isDead = false; lives = 3; isPaused = false; lastDirection = 'right';
   isCrouching = false; enemiesStopped = false; showMenu = false; currentWeather = 'rain';
   touchLeft = false; touchRight = false; touchCrouchActive = false;
   doubleJumpActive = false; canDoubleJump = false; isInvincible = false; isRespawning = false;
-  starsArray = [];
+  // Счёт НЕ СБРАСЫВАЕТСЯ — оставляем score как есть
 
   this.groundY = 320;
   this.bg = this.add.image(400, 200, 'bg');
@@ -263,7 +262,7 @@ function create() {
   });
 
   // Спавн бонусов
-  bonusSpawnTimer = this.time.addEvent({
+  this.time.addEvent({
     delay: 8000, loop: true, callback: () => {
       if (isDead || isPaused || showMenu || isRespawning) return;
       if (doubleJumpActive) return;
@@ -322,7 +321,7 @@ function create() {
   scoreFrame.lineStyle(2, 0xffaa44, 0.8);
   scoreFrame.strokeRoundedRect(10, 65, 140, 32, 8);
   scoreFrame.setDepth(999);
-  scoreText = this.add.text(80, 78, 'Уклонений: 0', { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace', fontWeight: 'bold' });
+  scoreText = this.add.text(80, 78, 'Уклонений: ' + score, { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace', fontWeight: 'bold' });
   scoreText.setOrigin(0.5, 0.5);
   scoreText.setDepth(1000);
   menuText = this.add.text(400, 200, '', { fontSize: '20px', fill: '#fff', backgroundColor: '#000', padding: { x: 20, y: 20 }, align: 'center' });
@@ -371,6 +370,79 @@ function shakePlayer() {
 }
 
 function damageEffect() { createStarEffect.call(this); shakePlayer.call(this); vibrateDevice(); }
+
+// КРАСИВЫЙ ВИХРЬ ИЗ ЗВЁЗД ПРИ СМЕРТИ
+function deathVortexEffect(respawnX, respawnY, onComplete) {
+  let stars = [];
+  let centerX = player.x, centerY = player.y;
+  let starCount = 500;
+  
+  // Создаём звёзды, расположенные по спирали
+  for (let i = 0; i < starCount; i++) {
+    let t = i / starCount; // 0..1
+    let angle = t * Math.PI * 8; // 4 оборота спирали
+    let radius = 20 + t * 180;
+    let x = centerX + Math.cos(angle) * radius;
+    let y = centerY + Math.sin(angle) * radius - 20;
+    let star = this.add.text(x, y, '✦', { fontSize: '12px', fill: '#ffaa44' });
+    star.setDepth(600);
+    star.setData('angle', angle);
+    star.setData('radius', radius);
+    star.setData('t', t);
+    stars.push(star);
+  }
+  
+  // Анимация раскручивания спирали наружу
+  let duration = 800;
+  stars.forEach((star, idx) => {
+    let startRadius = star.getData('radius');
+    let targetRadius = startRadius + 150;
+    this.tweens.add({
+      targets: star,
+      scale: { from: 1, to: 0.6 },
+      alpha: { from: 1, to: 0.8 },
+      duration: duration,
+      ease: 'Quadratic.In'
+    });
+    this.tweens.add({
+      targets: star,
+      x: star.x + Math.cos(star.getData('angle')) * 150,
+      y: star.y + Math.sin(star.getData('angle')) * 150,
+      duration: duration,
+      ease: 'Quadratic.Out'
+    });
+  });
+  
+  // Затем собираем звёзды в точку респавна
+  this.time.delayedCall(duration + 100, () => {
+    stars.forEach(star => {
+      this.tweens.add({
+        targets: star,
+        x: respawnX,
+        y: respawnY,
+        alpha: 0,
+        scale: 0.2,
+        duration: 1000,
+        ease: 'Cubic.In',
+        onComplete: () => star.destroy()
+      });
+    });
+    
+    // Эффект вспышки в точке сбора
+    let glow = this.add.circle(respawnX, respawnY, 10, 0xffaa44, 0.9);
+    this.tweens.add({
+      targets: glow,
+      scale: { from: 1, to: 12 },
+      alpha: 0,
+      duration: 800,
+      onComplete: () => glow.destroy()
+    });
+    
+    this.time.delayedCall(1000, () => {
+      onComplete();
+    });
+  });
+}
 
 function createBonusTimer() {
   if (bonusTimerGraphic) bonusTimerGraphic.destroy();
@@ -502,43 +574,28 @@ function playerHit() {
   player.setTint(0xff8888);
   if (invincibleTimer) invincibleTimer.remove();
   invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this);
+  
   if (lives <= 0) {
-    isDead = true; isRespawning = true; player.stop(); player.setVisible(false); player.body.enable = false;
+    isDead = true; isRespawning = true;
+    player.stop(); player.setVisible(false); player.body.enable = false;
     let respawnX = 200, respawnY = this.groundY;
-    // Эффект 1000 звёзд
-    let stars = [];
-    for (let i = 0; i < 1000; i++) {
-      let angle = Math.random() * Math.PI * 2;
-      let speed = 150 + Math.random() * 250;
-      let vx = Math.cos(angle) * speed;
-      let vy = Math.sin(angle) * speed - 80;
-      let star = this.add.text(player.x, player.y, '✦', { fontSize: '10px', fill: '#ffaa44' });
-      star.setDepth(600);
-      star.setData('vx', vx); star.setData('vy', vy);
-      stars.push(star);
-      this.tweens.add({ targets: star, x: star.x + vx * 0.4, y: star.y + vy * 0.4, alpha: { from: 1, to: 0.7 }, duration: 800, ease: 'Quadratic.Out' });
-    }
-    this.time.delayedCall(800, () => {
-      stars.forEach(star => {
-        this.tweens.add({ targets: star, x: respawnX, y: respawnY, alpha: 0, scale: 0.3, duration: 1200, ease: 'Cubic.In', onComplete: () => star.destroy() });
-      });
-      let glow = this.add.circle(respawnX, respawnY, 5, 0xffaa44, 0.8);
-      this.tweens.add({ targets: glow, scale: 8, alpha: 0, duration: 800, onComplete: () => glow.destroy() });
-      this.time.delayedCall(1200, () => {
-        player.setVisible(true); player.body.enable = true;
-        player.setPosition(respawnX, respawnY);
-        player.setVelocityX(0); player.setVelocityY(0);
-        player.clearTint(); player.setTexture('run1'); player.alpha = 1;
-        lives = 3; updateHeartsDisplay.call(this);
-        isDead = false; isRespawning = false;
-        isInvincible = true; player.setTint(0xff8888);
-        if (invincibleTimer) invincibleTimer.remove();
-        invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this);
-        enemies.children.iterate(e => { if (e) e.destroy(); });
-        specialEnemies.children.iterate(m => { if (m) m.destroy(); });
-        let appear = this.add.circle(respawnX, respawnY, 20, 0xffaa44, 0.6);
-        this.tweens.add({ targets: appear, scale: 3, alpha: 0, duration: 500, onComplete: () => appear.destroy() });
-      });
+    
+    deathVortexEffect.call(this, respawnX, respawnY, () => {
+      player.setVisible(true); player.body.enable = true;
+      player.setPosition(respawnX, respawnY);
+      player.setVelocityX(0); player.setVelocityY(0);
+      player.clearTint(); player.setTexture('run1'); player.alpha = 1;
+      lives = 3; updateHeartsDisplay.call(this);
+      isDead = false; isRespawning = false;
+      isInvincible = true; player.setTint(0xff8888);
+      if (invincibleTimer) invincibleTimer.remove();
+      invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this);
+      // Очищаем врагов
+      enemies.children.iterate(e => { if (e) e.destroy(); });
+      specialEnemies.children.iterate(m => { if (m) m.destroy(); });
+      // Эффект появления
+      let appear = this.add.circle(respawnX, respawnY, 20, 0xffaa44, 0.6);
+      this.tweens.add({ targets: appear, scale: 3, alpha: 0, duration: 500, onComplete: () => appear.destroy() });
     });
   }
 }
@@ -622,7 +679,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n💀 СМЕРТЬ: 1000 звёзд и возрождение\n📱 Вибрация + звёздочки + тряска\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни (не сбрасываются)\n👟 Кроссовок - двойной прыжок 15 сек!\n🌀 СМЕРТЬ: ЗОЛОТОЙ ВИХРЬ из 500 звёзд!\n📱 Вибрация + звёздочки + тряска\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
     return;
   } else menuText.setVisible(false);
   if (isDead || isPaused || isRespawning) return;
