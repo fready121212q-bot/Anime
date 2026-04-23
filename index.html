@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Круговой таймер с кроссовком</title>
+  <title>Runner Game — Исправленное получение урона</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -196,6 +196,9 @@ let bonusIcon = null;
 let bonusStartTime = 0;
 const BONUS_DURATION = 15000;
 
+let invincibleTimer = null;
+let isInvincible = false;
+
 let rainDrops = [];
 let rainStreaks = [];
 let lightningFlash;
@@ -260,6 +263,7 @@ function create() {
   touchCrouchActive = false;
   doubleJumpActive = false;
   canDoubleJump = false;
+  isInvincible = false;
 
   this.groundY = 320;
 
@@ -315,27 +319,53 @@ function create() {
     bonus.body.setGravityY(0);
   });
 
+  // Столкновение с врагами - только нанесение урона, враги не уничтожаются
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
+    if (isInvincible) return;
+    
     const enemyType = enemy.getData('type');
+    let hit = false;
+    
     if (enemyType === 'low') {
-      if (player.body.blocked.down) playerHit.call(this);
+      if (player.body.blocked.down) {
+        hit = true;
+      }
     } else {
-      if (!isCrouching) playerHit.call(this);
+      if (!isCrouching) {
+        hit = true;
+      }
     }
-    enemy.destroy();
+    
+    if (hit) {
+      playerHit.call(this);
+    }
+    // Враги НЕ уничтожаются, продолжают движение
   });
 
+  // Столкновение с золотыми/серебряными монстрами
   this.physics.add.overlap(player, specialEnemies, (playerObj, monster) => {
     if (isDead || isPaused || showMenu) return;
+    if (isInvincible) return;
+    
     const monsterData = monster.getData('type');
     const monsterHeight = monsterData === 'goldLow' || monsterData === 'silverLow' ? 'low' : 'high';
+    let hit = false;
+    
     if (monsterHeight === 'low') {
-      if (player.body.blocked.down) playerHit.call(this);
+      if (player.body.blocked.down) {
+        hit = true;
+      }
     } else {
-      if (!isCrouching) playerHit.call(this);
+      if (!isCrouching) {
+        hit = true;
+      }
     }
-    monster.destroy();
+    
+    if (hit) {
+      playerHit.call(this);
+    }
+    // Монстры НЕ уничтожаются
   });
 
   bonusSpawnTimer = this.time.addEvent({
@@ -351,12 +381,12 @@ function create() {
         bonus.body.setSize(15, 15, 5, 5);
         bonus.body.setCollideWorldBounds(true);
         bonus.setBounce(0.2);
-        bonus.setData('scored', false);
       }
     },
     callbackScope: this
   });
 
+  // Генерация врагов
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -452,22 +482,20 @@ function createBonusTimer() {
     bonusIcon = null;
   }
   
-  const radius = 18; // Уменьшенный радиус (в 2 раза меньше предыдущего 35)
+  const radius = 18;
   const x = player.x;
-  const y = player.y - 65; // Выше над головой
+  const y = player.y - 65;
   
   bonusTimerGraphic = this.add.graphics();
   bonusTimerGraphic.setDepth(550);
   bonusTimerGraphic.x = x;
   bonusTimerGraphic.y = y;
   
-  // Фон круга
   bonusTimerGraphic.fillStyle(0x000000, 0.7);
   bonusTimerGraphic.fillCircle(0, 0, radius + 3);
   bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.8);
   bonusTimerGraphic.strokeCircle(0, 0, radius);
   
-  // Иконка кроссовка в центре круга
   bonusIcon = this.add.image(x, y, 'sneaker');
   bonusIcon.setScale(0.12);
   bonusIcon.setDepth(551);
@@ -507,21 +535,14 @@ function updateBonusTimer() {
   const x = player.x;
   const y = player.y - 65;
   
-  // Обновляем позицию
   if (bonusTimerGraphic) {
     bonusTimerGraphic.x = x;
     bonusTimerGraphic.y = y;
-    
-    // Перерисовываем
     bonusTimerGraphic.clear();
-    
-    // Фон
     bonusTimerGraphic.fillStyle(0x000000, 0.7);
     bonusTimerGraphic.fillCircle(0, 0, radius + 3);
     bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.5);
     bonusTimerGraphic.strokeCircle(0, 0, radius);
-    
-    // Убывающая дуга
     const angle = 360 * percent;
     bonusTimerGraphic.lineStyle(3, 0xffaa44, 1);
     bonusTimerGraphic.beginPath();
@@ -529,7 +550,6 @@ function updateBonusTimer() {
     bonusTimerGraphic.strokePath();
   }
   
-  // Обновляем позицию иконки
   if (bonusIcon) {
     bonusIcon.x = x;
     bonusIcon.y = y;
@@ -553,23 +573,6 @@ function activateDoubleJumpBonus() {
     onComplete: () => activationEffect.destroy()
   });
   
-  const sparkEffect = this.add.particles(player.x, player.y, null, {
-    speed: { min: 100, max: 250 },
-    angle: { min: 0, max: 360 },
-    scale: { start: 0.2, end: 0 },
-    alpha: { start: 0.8, end: 0 },
-    lifespan: 500,
-    quantity: 20,
-    tint: 0xffaa44
-  });
-  const sparkGraphics = this.add.graphics();
-  sparkGraphics.fillStyle(0xffaa44, 1);
-  sparkGraphics.fillCircle(4, 4, 4);
-  sparkGraphics.generateTexture('spark', 8, 8);
-  sparkGraphics.clear();
-  sparkEffect.setTexture('spark');
-  this.time.delayedCall(300, () => sparkEffect.destroy());
-  
   if (doubleJumpTimer) doubleJumpTimer.remove();
   doubleJumpTimer = this.time.delayedCall(BONUS_DURATION, () => {
     doubleJumpActive = false;
@@ -582,7 +585,6 @@ function activateDoubleJumpBonus() {
       bonusIcon.destroy();
       bonusIcon = null;
     }
-    this.cameras.main.flash(300, 255, 200, 0);
   }, [], this);
   
   const bonusText = this.add.text(player.x, player.y - 50, 'ДВОЙНОЙ ПРЫЖОК!', { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace', fontWeight: 'bold' });
@@ -700,9 +702,20 @@ function updateHeartsDisplay() {
 
 function playerHit() {
   if (isDead || isPaused || showMenu) return;
+  if (isInvincible) return;
+  
   lives--;
   updateHeartsDisplay.call(this);
-  this.cameras.main.flash(500, 255, 0, 0);
+  
+  // Включаем неуязвимость на 1.5 секунды
+  isInvincible = true;
+  player.setTint(0xff8888);
+  
+  if (invincibleTimer) invincibleTimer.remove();
+  invincibleTimer = this.time.delayedCall(1500, () => {
+    isInvincible = false;
+    player.clearTint();
+  }, [], this);
   
   if (lives <= 0) {
     isDead = true;
@@ -714,19 +727,6 @@ function playerHit() {
     this.tweens.add({ targets: player, angle: 90, duration: 500, ease: 'Bounce.easeOut' });
     deathTimer = this.time.delayedCall(1500, () => {
       this.scene.restart();
-    });
-  } else {
-    isDead = true;
-    player.setTint(0xff0000);
-    player.setVelocityX(-300);
-    player.setVelocityY(-200);
-    enemies.children.iterate(enemy => { if (enemy) enemy.destroy(); });
-    specialEnemies.children.iterate(monster => { if (monster) monster.destroy(); });
-    this.time.delayedCall(1000, () => {
-      isDead = false;
-      player.clearTint();
-      player.setVelocityX(0);
-      this.tweens.add({ targets: player, alpha: 0.5, duration: 100, yoyo: true, repeat: 5, onComplete: () => { player.alpha = 1; } });
     });
   }
 }
@@ -865,19 +865,6 @@ function update() {
 
   updateBonusTimer.call(this);
 
-  if (doubleJumpActive && (this.cursors.left.isDown || this.cursors.right.isDown || touchLeft || touchRight) && player.body.blocked.down) {
-    if (Math.random() < 0.1) {
-      const spark = this.add.circle(player.x + (lastDirection === 'right' ? -15 : 15), player.y + 15, 2, 0xffaa44, 0.8);
-      this.tweens.add({
-        targets: spark,
-        alpha: 0,
-        scale: { from: 1, to: 0.5 },
-        duration: 300,
-        onComplete: () => spark.destroy()
-      });
-    }
-  }
-
   if (player.body.blocked.down) {
     canDoubleJump = doubleJumpActive;
   }
@@ -888,6 +875,7 @@ function update() {
       score++;
       updateScoreDisplay.call(this);
     }
+    if (enemy && enemy.x > 900) enemy.destroy();
   });
   
   specialEnemies.children.iterate(monster => {
@@ -896,6 +884,7 @@ function update() {
       score++;
       updateScoreDisplay.call(this);
     }
+    if (monster && monster.x < -100) monster.destroy();
   });
 
   const isOnGround = player.body.blocked.down;
@@ -993,9 +982,6 @@ function update() {
       else player.setFlipX(false);
     }
   }
-
-  enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
-  specialEnemies.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
 }
 </script>
 </body>
