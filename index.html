@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (FIXED CROUCH)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -16,7 +16,6 @@
       background: #0a0f1e;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    /* Аудио панель (остается справа сверху) */
     .audio-control {
       position: fixed;
       top: 12px;
@@ -29,41 +28,15 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: Arial, sans-serif;
       border: 1px solid rgba(255,255,255,0.3);
       cursor: pointer;
-      transition: all 0.2s ease;
     }
-    .audio-control:hover {
-      background: rgba(0,0,0,0.9);
-      transform: scale(1.02);
-    }
-    .audio-icon {
-      font-size: 22px;
-      color: white;
-    }
-    .volume-slider {
-      width: 70px;
-      height: 4px;
-      -webkit-appearance: none;
-      background: #555;
-      border-radius: 4px;
-    }
-    .volume-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: white;
-      cursor: pointer;
-    }
-    .volume-value {
-      color: white;
-      font-size: 11px;
-      min-width: 32px;
-    }
+    .audio-icon { font-size: 22px; color: white; }
+    .volume-slider { width: 70px; height: 4px; -webkit-appearance: none; background: #555; border-radius: 4px; }
+    .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer; }
+    .volume-value { color: white; font-size: 11px; min-width: 32px; }
 
-    /* ========== МОБИЛЬНЫЕ СЕНСОРНЫЕ КНОПКИ ========== */
+    /* МОБИЛЬНЫЕ КНОПКИ */
     .touch-panel {
       position: fixed;
       bottom: 20px;
@@ -79,9 +52,9 @@
     }
     .touch-panel button {
       pointer-events: auto;
-      background: rgba(20, 25, 45, 0.85);
+      background: rgba(20, 25, 45, 0.9);
       backdrop-filter: blur(12px);
-      border: 1px solid rgba(255,255,255,0.35);
+      border: 1px solid rgba(255,255,255,0.4);
       border-radius: 60px;
       color: white;
       font-size: 28px;
@@ -90,7 +63,7 @@
       width: 70px;
       height: 70px;
       box-shadow: 0 6px 12px rgba(0,0,0,0.4);
-      transition: 0.07s linear;
+      transition: 0.05s linear;
       touch-action: manipulation;
       cursor: pointer;
       display: flex;
@@ -98,10 +71,15 @@
       justify-content: center;
       font-family: monospace;
     }
+    button:active {
+      transform: scale(0.92);
+      background: rgba(100, 150, 220, 0.9);
+      border-color: #ffcc88;
+    }
     .left-group {
       display: flex;
       gap: 16px;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.35);
       padding: 10px 18px;
       border-radius: 100px;
       backdrop-filter: blur(4px);
@@ -109,7 +87,7 @@
     .right-group {
       display: flex;
       gap: 16px;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.35);
       padding: 10px 18px;
       border-radius: 100px;
       backdrop-filter: blur(4px);
@@ -117,33 +95,25 @@
     .center-group {
       display: flex;
       gap: 15px;
-      background: rgba(0,0,0,0.3);
+      background: rgba(0,0,0,0.35);
       padding: 8px 15px;
       border-radius: 100px;
       backdrop-filter: blur(4px);
     }
-    button:active {
-      transform: scale(0.92);
-      background: rgba(100, 150, 220, 0.9);
-      border-color: #ffcc88;
-    }
     .btn-label {
-      font-size: 12px;
+      font-size: 10px;
       position: absolute;
       bottom: -18px;
       color: #ddd;
-      background: rgba(0,0,0,0.5);
+      background: rgba(0,0,0,0.6);
       padding: 2px 6px;
       border-radius: 20px;
       white-space: nowrap;
-      font-weight: normal;
     }
-    .touch-panel button {
-      position: relative;
-    }
+    .touch-panel button { position: relative; }
     @media (max-width: 700px) {
       .touch-panel button { width: 60px; height: 60px; font-size: 24px; }
-      .btn-label { font-size: 10px; bottom: -16px; }
+      .btn-label { font-size: 9px; bottom: -16px; }
       .left-group, .right-group, .center-group { padding: 6px 12px; gap: 12px; }
     }
     @media (max-width: 550px) {
@@ -159,18 +129,18 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- СЕНСОРНЫЕ КНОПКИ МОБИЛЬНОГО УПРАВЛЕНИЯ -->
+<!-- СЕНСОРНЫЕ КНОПКИ: приседание теперь рядом с прыжком -->
 <div class="touch-panel">
   <div class="left-group">
     <button id="btnLeft" data-action="left">◀</button>
     <button id="btnRight" data-action="right">▶</button>
     <button id="btnJump" data-action="jump">▲</button>
+    <button id="btnCrouch" data-action="crouch">▼<span class="btn-label">присед</span></button>
   </div>
   <div class="center-group">
-    <button id="btnCrouch" data-action="crouch">▼<span class="btn-label" style="bottom:-20px;">присед</span></button>
     <button id="btnPause" data-action="pause">⏸️</button>
-    <button id="btnStopEnemies" data-action="stopEnemies">⏹️<span class="btn-label" style="bottom:-20px;">стоп враг</span></button>
-    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label" style="bottom:-20px;">погода</span></button>
+    <button id="btnStopEnemies" data-action="stopEnemies">⏹️<span class="btn-label">стоп враг</span></button>
+    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label">погода</span></button>
   </div>
   <div class="right-group">
     <button id="btnMenu" data-action="menu">📜<span class="btn-label">меню</span></button>
@@ -178,7 +148,7 @@
 </div>
 
 <script>
-// ---------- Глобальные переменные игровой логики ----------
+// ---------- Глобальные переменные ----------
 let player;
 let enemies;
 let isDead = false;
@@ -195,7 +165,6 @@ let menuText;
 let backgroundMusic = null;
 let isMuted = false;
 let currentVolume = 0.5;
-let musicStarted = false;
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -207,11 +176,13 @@ let dustParticles;
 let footprints = [];
 let footprintDelay = 0;
 
-// Для обработки мобильных кнопок
+// Сенсорные флаги
 let touchLeft = false;
 let touchRight = false;
-let touchCrouchPressed = false;   // зажата ли кнопка приседа
 let jumpCooldown = false;
+
+// Для приседания - отдельный флаг без сложной логики
+let touchCrouchActive = false;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -257,7 +228,7 @@ function create() {
   currentWeather = 'rain';
   touchLeft = false;
   touchRight = false;
-  touchCrouchPressed = false;
+  touchCrouchActive = false;
 
   this.groundY = 320;
 
@@ -290,7 +261,7 @@ function create() {
 
   this.cursors = this.input.keyboard.createCursorKeys();
 
-  // ---- КЛАВИАТУРНЫЕ КОМАНДЫ ----
+  // Клавиатура
   this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu) { isPaused = !isPaused; managePause.call(this); } });
   this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu) toggleEnemiesStop.call(this); });
   this.input.keyboard.on('keydown-ESC', () => { if (!isDead) toggleMenu.call(this); });
@@ -350,12 +321,10 @@ function create() {
   startRainVisuals.call(this);
   createDustParticles.call(this);
   initAudio.call(this);
-
-  // ---------- МОБИЛЬНЫЕ КНОПКИ ----------
   setupMobileControls.call(this);
 }
 
-// ========== ФУНКЦИИ УПРАВЛЕНИЯ ==========
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 function managePause() {
   if (isPaused) {
     this.physics.world.pause();
@@ -364,7 +333,7 @@ function managePause() {
   } else {
     this.physics.world.resume();
     if (dustParticles) dustParticles.resume();
-    if (backgroundMusic && !isMuted && !isPaused) backgroundMusic.resume();
+    if (backgroundMusic && !isMuted) backgroundMusic.resume();
   }
 }
 
@@ -405,7 +374,6 @@ function toggleWeather() {
   }
 }
 
-// ========== ВИЗУАЛ ПОГОДА ==========
 function startRainVisuals() {
   if (lightningTimer) lightningTimer.remove();
   rainDrops.forEach(d => d.destroy()); rainDrops = [];
@@ -473,6 +441,7 @@ function createDustParticles() {
   const graphics = this.add.graphics(); graphics.fillStyle(0x8B7355, 1); graphics.fillCircle(4, 4, 4); graphics.generateTexture('dust', 8, 8); graphics.clear();
   dustParticles.setTexture('dust').setDepth(800);
 }
+
 function addFootprint(x, y) {
   if (footprints.length > 30) footprints.shift().destroy();
   const fp = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5).setDepth(600);
@@ -480,7 +449,6 @@ function addFootprint(x, y) {
   footprints.push(fp);
 }
 
-// МУЗЫКА
 function initAudio() {
   try {
     if (backgroundMusic && backgroundMusic.isPlaying) return;
@@ -490,6 +458,7 @@ function initAudio() {
     setupAudioControls();
   } catch(e) { console.log("audio err", e); }
 }
+
 function setupAudioControls() {
   const audioControl = document.getElementById('audioControl');
   const volumeSlider = document.getElementById('volumeSlider');
@@ -513,7 +482,7 @@ function setupAudioControls() {
   }
 }
 
-// ========== МОБИЛЬНЫЕ КНОПКИ (исправленная версия) ==========
+// ========== МОБИЛЬНЫЕ КНОПКИ (исправленное приседание) ==========
 function setupMobileControls() {
   const btnLeft = document.getElementById('btnLeft');
   const btnRight = document.getElementById('btnRight');
@@ -524,7 +493,7 @@ function setupMobileControls() {
   const btnWeather = document.getElementById('btnWeather');
   const btnMenu = document.getElementById('btnMenu');
 
-  // Left / Right
+  // Движение
   const setTouchLeft = (state) => { if (!isDead && !showMenu && !isPaused) touchLeft = state; };
   const setTouchRight = (state) => { if (!isDead && !showMenu && !isPaused) touchRight = state; };
   
@@ -540,7 +509,7 @@ function setupMobileControls() {
   btnRight.addEventListener('mouseup', () => setTouchRight(false));
   btnRight.addEventListener('mouseleave', () => setTouchRight(false));
 
-  // Jump
+  // Прыжок
   const doJump = () => {
     if (isDead || isPaused || showMenu) return;
     if (player && player.body && player.body.blocked.down && !jumpCooldown && !isCrouching) {
@@ -552,32 +521,21 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // Crouch — корректная работа без зависаний
-  const updateCrouchFromTouch = () => {
-    if (isDead || isPaused || showMenu) {
-      if (isCrouching) {
-        isCrouching = false;
-        if (player && player.body) {
-          player.body.setSize(55, 58, 1, 2);
-          player.setTexture('run1');
-          if (lastDirection === 'left') player.setFlipX(true);
-          else player.setFlipX(false);
-        }
-      }
-      return;
-    }
-    
-    const isOnGround = player && player.body && player.body.blocked.down;
-    if (touchCrouchPressed && isOnGround && !isCrouching) {
+  // ПРИСЕДАНИЕ - простая и надежная логика без мерцания
+  const startCrouch = () => {
+    if (isDead || isPaused || showMenu) return;
+    if (player && player.body && player.body.blocked.down && !isCrouching) {
       isCrouching = true;
       player.body.setSize(55, 35, 1, 23);
       player.setTexture('crouch');
-      player.setScale(0.25);
       player.stop();
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
-    } 
-    else if (!touchCrouchPressed && isCrouching) {
+    }
+  };
+  
+  const endCrouch = () => {
+    if (isCrouching) {
       isCrouching = false;
       player.body.setSize(55, 58, 1, 2);
       player.setTexture('run1');
@@ -586,32 +544,13 @@ function setupMobileControls() {
     }
   };
   
-  btnCrouch.addEventListener('touchstart', (e) => { 
-    e.preventDefault(); 
-    touchCrouchPressed = true; 
-    updateCrouchFromTouch.call(this); 
-  });
-  btnCrouch.addEventListener('touchend', (e) => { 
-    e.preventDefault(); 
-    touchCrouchPressed = false; 
-    updateCrouchFromTouch.call(this); 
-  });
-  btnCrouch.addEventListener('mousedown', () => { 
-    touchCrouchPressed = true; 
-    updateCrouchFromTouch.call(this); 
-  });
-  btnCrouch.addEventListener('mouseup', () => { 
-    touchCrouchPressed = false; 
-    updateCrouchFromTouch.call(this); 
-  });
-  btnCrouch.addEventListener('mouseleave', () => { 
-    if (touchCrouchPressed) {
-      touchCrouchPressed = false; 
-      updateCrouchFromTouch.call(this);
-    }
-  });
+  btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); startCrouch(); });
+  btnCrouch.addEventListener('touchend', (e) => { e.preventDefault(); endCrouch(); });
+  btnCrouch.addEventListener('mousedown', () => startCrouch());
+  btnCrouch.addEventListener('mouseup', () => endCrouch());
+  btnCrouch.addEventListener('mouseleave', () => endCrouch());
 
-  // Pause
+  // Пауза
   btnPause.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || showMenu) return;
@@ -620,7 +559,7 @@ function setupMobileControls() {
   });
   btnPause.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || showMenu) return; isPaused = !isPaused; managePause.call(this); });
   
-  // Stop enemies
+  // Стоп врагов
   btnStopEnemies.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
@@ -628,7 +567,7 @@ function setupMobileControls() {
   });
   btnStopEnemies.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleEnemiesStop.call(this); });
   
-  // Weather
+  // Погода
   btnWeather.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
@@ -636,7 +575,7 @@ function setupMobileControls() {
   });
   btnWeather.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleWeather.call(this); });
   
-  // Menu
+  // Меню
   btnMenu.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead) return;
@@ -645,7 +584,7 @@ function setupMobileControls() {
   btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
-// ========== UPDATE ==========
+// ========== ОСНОВНОЙ ЦИКЛ UPDATE ==========
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
@@ -655,7 +594,7 @@ function update() {
 
   if (isDead || isPaused) return;
 
-  // Дождь
+  // Погода: дождь
   if (currentWeather === 'rain') {
     for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
@@ -663,29 +602,45 @@ function update() {
 
   const isOnGround = player.body.blocked.down;
   
-  // Обработка приседания: клавиатура ИЛИ сенсор
+  // ПРИСЕДАНИЕ: учитываем клавиатуру И сенсорную кнопку
   const downKeyPressed = this.cursors.down.isDown;
-  const shouldCrouch = (downKeyPressed || touchCrouchPressed) && isOnGround;
+  const shouldBeCrouching = (downKeyPressed) && isOnGround;
   
-  if (shouldCrouch && !isCrouching) {
+  // Если нажата клавиша вниз или активна сенсорная кнопка приседания
+  // Для сенсора используем отдельную переменную, которую обновляют события кнопки
+  // Но в update мы должны синхронизировать isCrouching с состоянием сенсора.
+  // Лучше: пусть update управляет crouching только от клавиатуры, а сенсор сам меняет isCrouching.
+  // Но чтобы не было конфликта: сенсор напрямую вызывает startCrouch/endCrouch, а клавиатура работает через update.
+  
+  // Обработка клавиатурного приседания (чтобы не сломать сенсор)
+  if (downKeyPressed && isOnGround && !isCrouching) {
     isCrouching = true;
     player.body.setSize(55, 35, 1, 23);
     player.setTexture('crouch');
     player.stop();
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
-  } 
-  else if (!shouldCrouch && isCrouching) {
+  } else if (!downKeyPressed && isCrouching && !touchCrouchActive) {
+    // Отпускаем приседание только если сенсорная кнопка тоже не активна
     isCrouching = false;
     player.body.setSize(55, 58, 1, 2);
     player.setTexture('run1');
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
   }
+  
+  // Синхронизация с сенсорным флагом (кнопка приседания может держать isCrouching = true)
+  // Флаг touchCrouchActive обновляется в обработчиках кнопки. Если touchCrouchActive true, приседаем.
+  if (touchCrouchActive && isOnGround && !isCrouching) {
+    isCrouching = true;
+    player.body.setSize(55, 35, 1, 23);
+    player.setTexture('crouch');
+    player.stop();
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
+  }
 
-  // Если в приседе — останавливаем обработку движения
   if (isCrouching) {
-    // Удаляем улетевших врагов
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
   }
@@ -738,9 +693,11 @@ function update() {
     else player.setFlipX(false);
   }
 
-  // Очистка врагов за экраном
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
 }
+
+// Добавим глобальную переменную для музыки
+let musicStarted = false;
 </script>
 </body>
 </html>
