@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (CROUCH AFTER JUMP FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (AIR CROUCH FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -176,11 +176,7 @@ let footprintDelay = 0;
 let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
-let touchCrouchActive = false;
-
-// Флаг для отслеживания, что игрок только что приземлился
-let justLanded = false;
-let justLandedTimer = null;
+let touchCrouchActive = false; // Флаг что кнопка приседания зажата
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -227,7 +223,6 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
-  justLanded = false;
 
   this.groundY = 320;
 
@@ -513,59 +508,27 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // ПРИСЕДАНИЕ - с проверкой на приземление
-  const applyCrouch = () => {
-    if (!player || !player.body) return;
-    // Проверяем, что игрок на земле ИЛИ только что приземлился (justLanded)
-    const isOnGround = player.body.blocked.down;
-    if ((isOnGround || justLanded) && !isCrouching && !isDead && !isPaused && !showMenu) {
-      isCrouching = true;
-      player.body.setSize(55, 35, 1, 23);
-      player.setTexture('crouch');
-      player.stop();
-      player.setVelocityX(0);
-      if (lastDirection === 'left') player.setFlipX(true);
-      else player.setFlipX(false);
-    }
-  };
-  
-  const releaseCrouch = () => {
-    if (isCrouching) {
-      isCrouching = false;
-      player.body.setSize(55, 58, 1, 2);
-      player.setTexture('run1');
-      if (lastDirection === 'left') player.setFlipX(true);
-      else player.setFlipX(false);
-    }
-  };
-  
+  // ПРИСЕДАНИЕ - просто устанавливаем флаг, всю логику делает update
   btnCrouch.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     touchCrouchActive = true;
-    applyCrouch();
   });
   
   btnCrouch.addEventListener('touchend', (e) => { 
     e.preventDefault(); 
     touchCrouchActive = false;
-    releaseCrouch();
   });
   
   btnCrouch.addEventListener('mousedown', () => { 
     touchCrouchActive = true;
-    applyCrouch();
   });
   
   btnCrouch.addEventListener('mouseup', () => { 
     touchCrouchActive = false;
-    releaseCrouch();
   });
   
   btnCrouch.addEventListener('mouseleave', () => { 
-    if (touchCrouchActive) {
-      touchCrouchActive = false;
-      releaseCrouch();
-    }
+    touchCrouchActive = false;
   });
 
   btnPause.addEventListener('click', (e) => {
@@ -598,6 +561,31 @@ function setupMobileControls() {
   btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
+// Функция для применения приседания
+function applyCrouch() {
+  if (!player || !player.body) return;
+  if (!isCrouching && !isDead && !isPaused && !showMenu) {
+    isCrouching = true;
+    player.body.setSize(55, 35, 1, 23);
+    player.setTexture('crouch');
+    player.stop();
+    player.setVelocityX(0);
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
+  }
+}
+
+// Функция для отмены приседания
+function releaseCrouch() {
+  if (isCrouching) {
+    isCrouching = false;
+    player.body.setSize(55, 58, 1, 2);
+    player.setTexture('run1');
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
+  }
+}
+
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
@@ -612,39 +600,26 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
-  const wasOnGround = player.body.blocked.down;
   const isOnGround = player.body.blocked.down;
   
-  // Отслеживаем момент приземления
-  if (!wasOnGround && isOnGround) {
-    justLanded = true;
-    if (justLandedTimer) clearTimeout(justLandedTimer);
-    justLandedTimer = setTimeout(() => {
-      justLanded = false;
-    }, 150); // 150 мс окно после приземления, когда можно присесть
+  // ГЛАВНАЯ ЛОГИКА: если кнопка приседания зажата И игрок на земле -> приседаем
+  // Это работает и когда кнопка была зажата в воздухе - при касании земли сразу сработает
+  if (touchCrouchActive && isOnGround && !isCrouching) {
+    applyCrouch();
   }
   
-  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (с учетом justLanded)
+  // Если кнопка приседания НЕ зажата И игрок в приседе -> встаём
+  if (!touchCrouchActive && isCrouching) {
+    releaseCrouch();
+  }
+  
+  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (стрелка вниз) - работает независимо
   const downKeyPressed = this.cursors.down.isDown;
-  
-  if (downKeyPressed && (isOnGround || justLanded) && !isCrouching && !touchCrouchActive) {
-    isCrouching = true;
-    player.body.setSize(55, 35, 1, 23);
-    player.setTexture('crouch');
-    player.stop();
-    player.setVelocityX(0);
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
-  } 
-  else if (!downKeyPressed && isCrouching && !touchCrouchActive) {
-    isCrouching = false;
-    player.body.setSize(55, 58, 1, 2);
-    player.setTexture('run1');
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
+  if (downKeyPressed && isOnGround && !isCrouching && !touchCrouchActive) {
+    applyCrouch();
   }
   
-  // Если в приседе - полностью блокируем движение
+  // Если в приседе - блокируем движение
   if (isCrouching) {
     player.setVelocityX(0);
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
@@ -701,5 +676,4 @@ function update() {
 }
 </script>
 </body>
-</html>
 </html>
