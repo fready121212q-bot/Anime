@@ -7,7 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
-      touch-action: none; /* Предотвращает прокрутку страницы при касаниях */
+      touch-action: none;
     }
     
     .audio-control {
@@ -59,7 +59,6 @@
       text-align: center;
     }
     
-    /* Мобильные кнопки управления */
     .mobile-controls {
       position: fixed;
       bottom: 20px;
@@ -94,17 +93,11 @@
       justify-content: center;
       font-size: 30px;
       cursor: pointer;
-      transition: none;
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
       -webkit-tap-highlight-color: transparent;
-    }
-    
-    .control-btn:active {
-      transform: none;
-      background: rgba(255,255,255,0.2);
     }
     
     .action-buttons {
@@ -123,17 +116,11 @@
       justify-content: center;
       font-size: 28px;
       cursor: pointer;
-      transition: none;
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
       -webkit-tap-highlight-color: transparent;
-    }
-    
-    .action-btn:active {
-      transform: none;
-      background: rgba(0,0,0,0.7);
     }
     
     .jump-btn {
@@ -146,7 +133,6 @@
       border-color: #FF9800;
     }
     
-    /* Кнопка паузы */
     .pause-btn {
       position: fixed;
       top: 20px;
@@ -165,12 +151,7 @@
       pointer-events: auto;
       color: white;
       backdrop-filter: blur(5px);
-      transition: none;
       -webkit-tap-highlight-color: transparent;
-    }
-    
-    .pause-btn:active {
-      transform: none;
     }
     
     @media (max-width: 768px) {
@@ -214,7 +195,6 @@
       }
     }
     
-    /* Инструкция для мобильных */
     .mobile-tutorial {
       position: fixed;
       top: 50%;
@@ -250,7 +230,6 @@
       font-size: 14px;
     }
     
-    /* Кнопка для запуска музыки на мобильных */
     .music-launch-btn {
       position: fixed;
       bottom: 50%;
@@ -276,10 +255,6 @@
       50% { transform: translate(-50%, -50%) scale(1.05); }
       100% { transform: translate(-50%, -50%) scale(1); }
     }
-    
-    .music-launch-btn:active {
-      transform: translate(-50%, -50%) scale(0.95);
-    }
   </style>
 </head>
 
@@ -291,7 +266,6 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- Мобильные элементы управления -->
 <div class="mobile-controls">
   <div class="control-panel">
     <div class="control-btn" id="moveLeftBtn">←</div>
@@ -309,10 +283,8 @@
   <p>⬆️ - Прыжок (нажать)</p>
   <p>⬇️ - Приседание (удерживать)</p>
   <p>⏸ - Пауза/Меню</p>
-  <p>🔊 - Регулировка громкости</p>
 </div>
 
-<!-- Кнопка для запуска музыки на мобильных -->
 <button class="music-launch-btn" id="musicLaunchBtn">🎵 Нажмите для запуска музыки 🎵</button>
 
 <script>
@@ -330,7 +302,6 @@ let enemiesStopped = false;
 let showMenu = false;
 let menuText;
 
-// Аудио - глобальная переменная вне сцены
 let backgroundMusic = null;
 let isMuted = false;
 let currentVolume = 0.5;
@@ -441,7 +412,6 @@ function create() {
 
   this.cursors = this.input.keyboard.createCursorKeys();
   
-  // Клавиатурное управление (для отладки на ПК)
   this.input.keyboard.on('keydown-SPACE', () => {
     if (!isDead && !showMenu) {
       isPaused = !isPaused;
@@ -503,20 +473,17 @@ function create() {
 
   enemies = this.physics.add.group({ allowGravity: false });
 
-  // СТОЛКНОВЕНИЕ С ВРАГАМИ
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     
     const enemyType = enemy.getData('type');
     
     if (enemyType === 'low') {
-      // Красный враг - урон если на земле (нужно прыгать)
       if (player.body.blocked.down) {
         playerHit.call(this);
       }
       enemy.destroy();
     } else {
-      // Фиолетовый враг - урон если не присел (нужно приседать)
       if (!isCrouching) {
         playerHit.call(this);
       }
@@ -539,7 +506,6 @@ function create() {
       let offsetY;
       
       if (enemyType === 'low') {
-        // КРАСНЫЙ - по земле, нужно ПРЫГАТЬ
         enemyY = this.groundY + 48;
         enemyColor = 0xff6666;
         enemyWidth = 320;
@@ -547,7 +513,6 @@ function create() {
         offsetX = -35;
         offsetY = -35;
       } else {
-        // ФИОЛЕТОВЫЙ - высоко (на уровне головы), нужно ПРИСЕДАТЬ
         enemyY = this.groundY - 15;
         enemyColor = 0xaa66ff;
         enemyWidth = 180;
@@ -593,12 +558,10 @@ function create() {
   startRainVisuals.call(this);
   createDustParticles.call(this);
   
-  // Настройка мобильного управления
   setupMobileControls.call(this);
 }
 
 function setupMobileControls() {
-  // Получаем элементы управления
   const moveLeftBtn = document.getElementById('moveLeftBtn');
   const moveRightBtn = document.getElementById('moveRightBtn');
   const jumpBtn = document.getElementById('jumpBtn');
@@ -606,7 +569,7 @@ function setupMobileControls() {
   const pauseBtn = document.getElementById('pauseBtn');
   const musicLaunchBtn = document.getElementById('musicLaunchBtn');
   
-  // Левая кнопка - удержание для движения влево
+  // Левая кнопка
   if (moveLeftBtn) {
     moveLeftBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -621,7 +584,7 @@ function setupMobileControls() {
     });
   }
   
-  // Правая кнопка - удержание для движения вправо
+  // Правая кнопка
   if (moveRightBtn) {
     moveRightBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -636,15 +599,12 @@ function setupMobileControls() {
     });
   }
   
-  // Кнопка прыжка - однократное нажатие
+  // Кнопка прыжка - срабатывает при касании
   if (jumpBtn) {
     jumpBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       jumpRequested = true;
-    });
-    jumpBtn.addEventListener('touchend', (e) => {
-      e.preventDefault();
-      // Не сбрасываем сразу, даем время на обработку в update
+      console.log('Прыжок запрошен'); // Для отладки
     });
   }
   
@@ -653,13 +613,16 @@ function setupMobileControls() {
     crouchBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       crouchActive = true;
+      console.log('Приседание активно'); // Для отладки
     });
     crouchBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
       crouchActive = false;
+      console.log('Приседание отключено'); // Для отладки
     });
     crouchBtn.addEventListener('touchcancel', (e) => {
       crouchActive = false;
+      console.log('Приседание отключено'); // Для отладки
     });
   }
   
@@ -686,7 +649,7 @@ function setupMobileControls() {
     });
   }
   
-  // Запуск музыки по нажатию кнопки (для мобильных устройств)
+  // Запуск музыки
   if (musicLaunchBtn) {
     musicLaunchBtn.addEventListener('click', () => {
       initAudio.call(gameScene);
@@ -703,31 +666,20 @@ function setupMobileControls() {
 
 function initAudio() {
   try {
-    if (backgroundMusic && backgroundMusic.isPlaying) {
-      console.log('Музыка уже играет');
-      return;
-    }
+    if (backgroundMusic && backgroundMusic.isPlaying) return;
     
     if (backgroundMusic && !backgroundMusic.isPlaying) {
-      if (!isMuted) {
-        backgroundMusic.resume();
-      }
+      if (!isMuted) backgroundMusic.resume();
       return;
     }
     
-    // Создаем и запускаем музыку
     backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
-    
-    // Для мобильных устройств нужно явно вызвать play
     const playPromise = backgroundMusic.play();
     
     if (playPromise !== undefined) {
       playPromise.then(() => {
-        console.log('Музыка успешно запущена');
         musicStarted = true;
       }).catch(error => {
-        console.log('Автовоспроизведение заблокировано:', error);
-        // Показываем кнопку для ручного запуска
         const musicBtn = document.getElementById('musicLaunchBtn');
         if (musicBtn) musicBtn.style.display = 'block';
       });
@@ -735,7 +687,6 @@ function initAudio() {
     
     setupAudioControls();
   } catch(e) {
-    console.log('Аудио не загружено:', e);
     const musicBtn = document.getElementById('musicLaunchBtn');
     if (musicBtn) musicBtn.style.display = 'block';
   }
@@ -987,23 +938,21 @@ function update() {
     }
   }
 
-  // ПРИСЕДАНИЕ (удержание кнопки)
+  // ПРИСЕДАНИЕ - проверяем каждые кадр
   const downPressed = this.cursors.down.isDown || crouchActive;
   const isOnGround = player.body.blocked.down;
   
-  if (downPressed && isOnGround) {
-    if (!isCrouching) {
-      isCrouching = true;
-      player.body.setSize(55, 35, 1, 23);
-      player.setTexture('crouch');
-      player.setScale(0.25);
-      player.stop();
-      player.setVelocityX(0);
-      if (lastDirection === 'left') {
-        player.setFlipX(true);
-      } else {
-        player.setFlipX(false);
-      }
+  if (downPressed && isOnGround && !isCrouching) {
+    isCrouching = true;
+    player.body.setSize(55, 35, 1, 23);
+    player.setTexture('crouch');
+    player.setScale(0.25);
+    player.stop();
+    player.setVelocityX(0);
+    if (lastDirection === 'left') {
+      player.setFlipX(true);
+    } else {
+      player.setFlipX(false);
     }
   } else if (!downPressed && isCrouching) {
     isCrouching = false;
@@ -1026,7 +975,7 @@ function update() {
     return;
   }
 
-  // ДВИЖЕНИЕ (удержание кнопок)
+  // ДВИЖЕНИЕ
   let moving = false;
   player.setVelocityX(0);
 
@@ -1044,11 +993,11 @@ function update() {
     player.setFlipX(false);
   }
 
-  // ПРЫЖОК (однократное нажатие)
+  // ПРЫЖОК - проверяем запрос и сразу сбрасываем
   if ((this.cursors.up.isDown || jumpRequested) && player.body.blocked.down) {
     player.setVelocityY(-260);
     moving = true;
-    jumpRequested = false; // Сбрасываем запрос на прыжок
+    jumpRequested = false; // Сбрасываем после прыжка
   }
 
   if (moving && isOnGround && !isCrouching) {
