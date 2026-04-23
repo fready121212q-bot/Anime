@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — 6 огненных шаров + таймер (ИСПРАВЛЕНО)</title>
+  <title>Runner Game — 6 огненных шаров (опущены ниже)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * { user-select: none; touch-action: manipulation; }
@@ -108,7 +108,7 @@ function create() {
   startRainVisuals.call(this); createDustParticles.call(this); initAudio.call(this); setupMobileControls.call(this);
 }
 
-// КРУГОВОЙ ТАЙМЕР ДЛЯ ОГНЕННЫХ ШАРОВ (аналог кроссовка)
+// КРУГОВОЙ ТАЙМЕР ДЛЯ ОГНЕННЫХ ШАРОВ
 function createFireShieldTimer() {
   if (fireShieldTimerGraphic) fireShieldTimerGraphic.destroy();
   if (fireShieldIcon) fireShieldIcon.destroy();
@@ -189,11 +189,13 @@ function updateFireShield() {
   }
   fireShieldRotation += 0.2;
   let radius = 50;
+  // Смещение вниз на 25 пикселей (примерно 1.5 размера шара, так как шар 0.1 от 64px ≈ 6.4px, 1.5 размера ≈ 10px, но для наглядности смещаем на 25)
+  let verticalOffset = 25;
   for (let i = 0; i < fireballs.length; i++) {
     if (fireballs[i]) {
       let angle = fireShieldRotation + (i * Math.PI * 2 / fireballs.length);
       let x = player.x + Math.cos(angle) * radius;
-      let y = player.y + Math.sin(angle) * radius - 15;
+      let y = player.y + Math.sin(angle) * radius - 15 + verticalOffset;
       fireballs[i].setPosition(x, y);
     }
   }
