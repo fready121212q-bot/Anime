@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Счётчик уклонений</title>
+  <title>Runner Game — Счётчик уклонений (ИСПРАВЛЕН)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -167,6 +167,10 @@ let currentVolume = 0.5;
 let score = 0;
 let scoreText;
 
+// Для отслеживания успешно пройденных врагов
+let passedEnemies = new Set();
+let passedSpecialEnemies = new Set();
+
 let rainDrops = [];
 let rainStreaks = [];
 let lightningFlash;
@@ -228,6 +232,8 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
+  passedEnemies.clear();
+  passedSpecialEnemies.clear();
 
   this.groundY = 320;
 
@@ -268,31 +274,21 @@ function create() {
   enemies = this.physics.add.group({ allowGravity: false });
   specialEnemies = this.physics.add.group({ allowGravity: false });
 
-  // Столкновение с обычными врагами
+  // Столкновение с обычными врагами - только нанесение урона
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     const enemyType = enemy.getData('type');
-    let avoided = false;
     
     if (enemyType === 'low') {
       if (player.body.blocked.down) {
         playerHit.call(this);
-      } else {
-        avoided = true;
       }
     } else {
       if (!isCrouching) {
         playerHit.call(this);
-      } else {
-        avoided = true;
       }
     }
-    
-    if (avoided) {
-      score++;
-      updateScoreDisplay.call(this);
-      this.cameras.main.flash(100, 100, 255, 0);
-    }
+    // Враг уничтожается при столкновении в любом случае
     enemy.destroy();
   });
 
@@ -302,30 +298,45 @@ function create() {
     const monsterData = monster.getData('type');
     const monsterHeight = monsterData === 'goldLow' || monsterData === 'silverLow' ? 'low' : 'high';
     
-    let avoided = false;
     if (monsterHeight === 'low') {
       if (player.body.blocked.down) {
         playerHit.call(this);
-      } else {
-        avoided = true;
       }
     } else {
       if (!isCrouching) {
         playerHit.call(this);
-      } else {
-        avoided = true;
       }
-    }
-    
-    if (avoided) {
-      score++;
-      updateScoreDisplay.call(this);
-      this.cameras.main.flash(100, 255, 215, 0);
     }
     monster.destroy();
   });
 
-  // Генерация обычных врагов
+  // Отслеживание врагов, которые покинули экран слева (обычные)
+  this.physics.world.on('worldbounds', (body) => {
+    const gameObject = body.gameObject;
+    if (gameObject && (gameObject === enemies.getChildren().find(e => e === gameObject))) {
+      if (body.position.x < -100 && !passedEnemies.has(gameObject)) {
+        passedEnemies.add(gameObject);
+        score++;
+        updateScoreDisplay.call(this);
+        this.cameras.main.flash(80, 100, 255, 100);
+      }
+    }
+  });
+
+  // Отслеживание золотых/серебряных монстров, которые покинули экран справа
+  this.physics.world.on('worldbounds', (body) => {
+    const gameObject = body.gameObject;
+    if (gameObject && (gameObject === specialEnemies.getChildren().find(m => m === gameObject))) {
+      if (body.position.x > 900 && !passedSpecialEnemies.has(gameObject)) {
+        passedSpecialEnemies.add(gameObject);
+        score++;
+        updateScoreDisplay.call(this);
+        this.cameras.main.flash(80, 255, 215, 100);
+      }
+    }
+  });
+
+  // Генерация обычных врагов (справа налево)
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -343,18 +354,18 @@ function create() {
         offsetX = -45; offsetY = -45;
       }
       let enemy = enemies.create(850, enemyY, 'enemy');
-      if (!enemiesStopped) enemy.setVelocityX(enemiesSpeed);
-      else enemy.setVelocityX(0);
+      enemy.setVelocityX(enemiesStopped ? 0 : enemiesSpeed);
       enemy.setScale(0.2);
       enemy.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
       enemy.play('enemyAnim');
       enemy.setData('type', enemyType);
       enemy.setTint(enemyType === 'low' ? 0xff6666 : 0xaa66ff);
+      enemy.body.world.onWorldBounds = true;
     },
     callbackScope: this
   });
 
-  // Генерация золотых и серебряных монстров
+  // Генерация золотых и серебряных монстров (слева направо)
   this.time.addEvent({
     delay: 2500,
     loop: true,
@@ -381,14 +392,14 @@ function create() {
       tintColor = isGold ? 0xffd700 : 0xc0c0c0;
       
       let monster = specialEnemies.create(-50, monsterY, 'enemy');
-      if (!enemiesStopped) monster.setVelocityX(specialEnemiesSpeed);
-      else monster.setVelocityX(0);
+      monster.setVelocityX(enemiesStopped ? 0 : specialEnemiesSpeed);
       monster.setScale(0.2);
       monster.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
       monster.play('enemyAnim');
       monster.setData('type', monsterType);
       monster.setTint(tintColor);
       monster.setFlipX(true);
+      monster.body.world.onWorldBounds = true;
     },
     callbackScope: this
   });
@@ -671,8 +682,6 @@ function update() {
   
   if (isCrouching) {
     player.setVelocityX(0);
-    enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
-    specialEnemies.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
     return;
   }
 
@@ -725,6 +734,7 @@ function update() {
     }
   }
 
+  // Удаление врагов за экраном
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
   specialEnemies.children.iterate(monster => { if (monster && monster.x > 900) monster.destroy(); });
 }
