@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Взрыв 1000 звёзд + телепорт</title>
+  <title>Runner Game — Взрыв 1000 звёзд + фикс движения</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -337,6 +337,12 @@ function create() {
   setupMobileControls.call(this);
 }
 
+function resetTouchControls() {
+  touchLeft = false;
+  touchRight = false;
+  touchCrouchActive = false;
+}
+
 function vibrateDevice() { if (window.navigator && window.navigator.vibrate) { try { window.navigator.vibrate(80); } catch(e) {} } }
 
 function createStarEffect() {
@@ -381,7 +387,6 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
   let centerX = player.x, centerY = player.y;
   let starCount = 1000;
   
-  // Создаём 1000 звёзд
   for (let i = 0; i < starCount; i++) {
     let angle = Math.random() * Math.PI * 2;
     let speed = 150 + Math.random() * 300;
@@ -393,7 +398,6 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
     star.setData('vy', vy);
     stars.push(star);
     
-    // Анимация разлёта
     this.tweens.add({
       targets: star,
       x: star.x + vx * 0.4,
@@ -405,7 +409,6 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
     });
   }
   
-  // Эффект вспышки
   let flash = this.add.circle(centerX, centerY, 30, 0xffaa44, 0.9);
   this.tweens.add({
     targets: flash,
@@ -415,19 +418,13 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
     onComplete: () => flash.destroy()
   });
   
-  // Тряска камеры
   this.cameras.main.shake(300, 0.02);
   
-  // Через 600 мс телепортируем персонажа и собираем звёзды
   this.time.delayedCall(600, () => {
-    // Телепортируем персонажа на место респавна
-    player.setVisible(true);
-    player.body.enable = true;
     player.setPosition(respawnX, respawnY);
     player.setVelocityX(0);
     player.setVelocityY(0);
     
-    // Собираем оставшиеся звёзды в точку респавна
     stars.forEach(star => {
       this.tweens.add({
         targets: star,
@@ -441,7 +438,6 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
       });
     });
     
-    // Эффект появления в точке респавна
     let appearGlow = this.add.circle(respawnX, respawnY, 15, 0xffaa44, 0.8);
     this.tweens.add({
       targets: appearGlow,
@@ -591,6 +587,8 @@ function playerHit() {
   if (lives <= 0) {
     isDead = true; isRespawning = true;
     player.stop(); player.setVisible(false); player.body.enable = false;
+    // Сбрасываем сенсорные кнопки
+    resetTouchControls();
     // Останавливаем генерацию врагов
     enemiesGenerationEnabled = false;
     // Очищаем всех существующих врагов
@@ -600,6 +598,8 @@ function playerHit() {
     let respawnX = 200, respawnY = this.groundY;
     
     explosionTeleportEffect.call(this, respawnX, respawnY, () => {
+      player.setVisible(true);
+      player.body.enable = true;
       player.clearTint(); player.setTexture('run1'); player.alpha = 1;
       lives = 3; updateHeartsDisplay.call(this);
       // СБРАСЫВАЕМ СЧЁТЧИК УКЛОНЕНИЙ
