@@ -144,10 +144,11 @@
       border-color: #FF9800;
     }
     
+    /* Кнопка паузы - перемещена в левый верхний угол */
     .pause-btn {
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      top: 20px;
+      left: 20px;
       width: 50px;
       height: 50px;
       border-radius: 50%;
@@ -161,6 +162,12 @@
       z-index: 2000;
       pointer-events: auto;
       color: white;
+      backdrop-filter: blur(5px);
+    }
+    
+    .pause-btn:active {
+      transform: scale(0.95);
+      background: rgba(255,255,255,0.3);
     }
     
     .swipe-indicator {
@@ -191,6 +198,18 @@
       .control-panel {
         padding: 8px 15px;
       }
+      .pause-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 18px;
+        top: 15px;
+        left: 15px;
+      }
+      .audio-control {
+        top: 15px;
+        right: 15px;
+        padding: 6px 12px;
+      }
     }
     
     @media (max-width: 480px) {
@@ -212,7 +231,7 @@
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.9);
+      background: rgba(0,0,0,0.95);
       color: white;
       padding: 20px;
       border-radius: 15px;
@@ -222,6 +241,8 @@
       max-width: 80%;
       pointer-events: none;
       animation: fadeOut 3s forwards;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255,255,255,0.3);
     }
     
     @keyframes fadeOut {
@@ -232,11 +253,43 @@
     
     .mobile-tutorial h3 {
       margin: 0 0 10px 0;
+      color: #ffd700;
     }
     
     .mobile-tutorial p {
       margin: 5px 0;
       font-size: 14px;
+    }
+    
+    /* Кнопка для запуска музыки на мобильных */
+    .music-launch-btn {
+      position: fixed;
+      bottom: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 50px;
+      padding: 15px 30px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      z-index: 5000;
+      font-family: Arial, sans-serif;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      animation: pulse 2s infinite;
+      white-space: nowrap;
+    }
+    
+    @keyframes pulse {
+      0% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.05); }
+      100% { transform: translate(-50%, -50%) scale(1); }
+    }
+    
+    .music-launch-btn:active {
+      transform: translate(-50%, -50%) scale(0.95);
     }
   </style>
 </head>
@@ -263,13 +316,17 @@
 <div class="pause-btn" id="pauseBtn">⏸</div>
 <div class="swipe-indicator" id="swipeIndicator">👆</div>
 <div class="mobile-tutorial" id="mobileTutorial">
-  <h3>📱 Управление на телефоне</h3>
+  <h3>🎮 Управление на телефоне</h3>
   <p>⬅️ ➡️ - Кнопки для движения</p>
   <p>⬆️ - Прыжок (от красных врагов)</p>
   <p>⬇️ - Приседание (от фиолетовых)</p>
   <p>🤚 Свайп вверх/вниз по экрану</p>
   <p>⏸ - Пауза/Меню</p>
+  <p>🔊 - Регулировка громкости</p>
 </div>
+
+<!-- Кнопка для запуска музыки на мобильных -->
+<button class="music-launch-btn" id="musicLaunchBtn">🎵 Нажмите для запуска музыки 🎵</button>
 
 <script>
 let player;
@@ -291,6 +348,7 @@ let backgroundMusic = null;
 let isMuted = false;
 let currentVolume = 0.5;
 let musicStarted = false;
+let gameScene = null;
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -347,6 +405,7 @@ function preload() {
 }
 
 function create() {
+  gameScene = this;
   isDead = false;
   lives = 3;
   isPaused = false;
@@ -552,9 +611,6 @@ function create() {
   startRainVisuals.call(this);
   createDustParticles.call(this);
   
-  // МУЗЫКА - запускаем только если ещё не запущена
-  initAudio.call(this);
-  
   // Настройка мобильного управления
   setupMobileControls.call(this);
 }
@@ -567,6 +623,7 @@ function setupMobileControls() {
   const crouchBtn = document.getElementById('crouchBtn');
   const pauseBtn = document.getElementById('pauseBtn');
   const swipeIndicator = document.getElementById('swipeIndicator');
+  const musicLaunchBtn = document.getElementById('musicLaunchBtn');
   
   // Обработка касаний для кнопок движения
   if (moveLeftBtn) {
@@ -635,20 +692,30 @@ function setupMobileControls() {
   
   if (pauseBtn) {
     pauseBtn.addEventListener('click', () => {
-      if (!isDead && !showMenu) {
+      if (!isDead && !showMenu && gameScene) {
         isPaused = !isPaused;
         if (isPaused) {
-          if (game.scene.scenes[0]) game.scene.scenes[0].physics.world.pause();
+          gameScene.physics.world.pause();
           if (dustParticles) dustParticles.pause();
           if (backgroundMusic && !isMuted) backgroundMusic.pause();
           pauseBtn.textContent = '▶';
+          pauseBtn.style.background = 'rgba(76, 175, 80, 0.7)';
         } else {
-          if (game.scene.scenes[0]) game.scene.scenes[0].physics.world.resume();
+          gameScene.physics.world.resume();
           if (dustParticles) dustParticles.resume();
           if (backgroundMusic && !isMuted) backgroundMusic.resume();
           pauseBtn.textContent = '⏸';
+          pauseBtn.style.background = 'rgba(0,0,0,0.7)';
         }
       }
+    });
+  }
+  
+  // Запуск музыки по нажатию кнопки (для мобильных устройств)
+  if (musicLaunchBtn) {
+    musicLaunchBtn.addEventListener('click', () => {
+      initAudio.call(gameScene);
+      musicLaunchBtn.style.display = 'none';
     });
   }
   
@@ -718,13 +785,29 @@ function initAudio() {
       return;
     }
     
+    // Создаем и запускаем музыку
     backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
-    backgroundMusic.play();
-    musicStarted = true;
+    
+    // Для мобильных устройств нужно явно вызвать play
+    const playPromise = backgroundMusic.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.then(() => {
+        console.log('Музыка успешно запущена');
+        musicStarted = true;
+      }).catch(error => {
+        console.log('Автовоспроизведение заблокировано:', error);
+        // Показываем кнопку для ручного запуска
+        const musicBtn = document.getElementById('musicLaunchBtn');
+        if (musicBtn) musicBtn.style.display = 'block';
+      });
+    }
     
     setupAudioControls();
   } catch(e) {
     console.log('Аудио не загружено:', e);
+    const musicBtn = document.getElementById('musicLaunchBtn');
+    if (musicBtn) musicBtn.style.display = 'block';
   }
 }
 
