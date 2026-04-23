@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Runner Game</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
+  <style>
+    .audio-control {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 2000;
+      background: rgba(0,0,0,0.7);
+      border-radius: 30px;
+      padding: 8px 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: Arial, sans-serif;
+      backdrop-filter: blur(5px);
+      border: 1px solid rgba(255,255,255,0.3);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .audio-control:hover {
+      background: rgba(0,0,0,0.9);
+      transform: scale(1.05);
+    }
+    .audio-icon {
+      font-size: 24px;
+      color: white;
+    }
+    .volume-slider {
+      width: 80px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #444;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #fff;
+      cursor: pointer;
+    }
+    .volume-value {
+      color: white;
+      font-size: 12px;
+      min-width: 35px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body style="margin:0; overflow:hidden;">
+
+<div class="audio-control" id="audioControl">
+  <div class="audio-icon" id="audioIcon">🔊</div>
+  <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
+  <div class="volume-value" id="volumeValue">50%</div>
+</div>
+
+<script>
+let player;
+let enemies;
+let isDead = false;
+let deathTimer;
+let lives = 3;
+let hearts = [];
+let isPaused = false;
+let enemiesSpeed = -200;
+let lastDirection = 'right';
+let isCrouching = false;
+let enemiesStopped = false;
+let showMenu = false;
+let menuText;
+
+// Аудио - глобальная переменная вне сцены
+let backgroundMusic = null;
+let isMuted = false;
+let currentVolume = 0.5;
+let musicStarted = false;
+
+let rainDrops = [];
+let rainStreaks = [];
+let lightningFlash;
+let lightningTimer;
+let currentWeather = 'rain';
+
+let dustParticles;
+let footprints = [];
+let footprintDelay = 0;
+
+const game = new Phaser.Game({
+  type: Phaser.AUTO,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 800,
+    height: 400
+  },
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 800 } }
+  },
+  scene: {
+    preload,
+    create,
+    update
+  }
+});
+
+function preload() {
+  this.load.image('bg', 'bg.png');
+  this.load.image('run1', 'run1.png');
+  this.load.image('run2', 'run2.png');
+  this.load.image('run3', 'run3.png');
+  this.load.image('run4', 'run4.png');
+  this.load.image('crouch', 'crouch.png');
+  this.load.image('enemy', 'enemy.png');
+  this.load.image('enemy2', 'enemy2.png');
+  this.load.image('enemy3', 'enemy3.png');
+  this.load.image('heart', 'heart.png');
+  this.load.audio('bgMusic', 'music.mp3');
+}
+
+function create() {
+  isDead = false;
+  lives = 3;
+  isPaused = false;
+  lastDirection = 'right';
+  isCrouching = false;
+  enemiesStopped = false;
+  showMenu = false;
+  currentWeather = 'rain';
+  
+  this.groundY = 320;
+
+  this.bg = this.add.image(400, 200, 'bg');
+  this.bg.displayWidth = 800;
+  this.bg.displayHeight = 400;
+
+  this.ground = this.physics.add.staticGroup();
+  const groundBlock = this.ground.create(400, this.groundY + 40)
+    .setDisplaySize(800, 40)
+    .refreshBody();
+  groundBlock.visible = false;
+
+  player = this.physics.add.sprite(200, this.groundY, 'run1');
+  player.setScale(0.25);
+  player.setCollideWorldBounds(true);
+  this.physics.add.collider(player, this.ground);
+  player.body.setSize(55, 58, 1, 2);
+
+  this.anims.create({
+    key: 'run',
+    frames: [
+      { key: 'run1' },
+      { key: 'run2' },
+      { key: 'run3' },
+      { key: 'run4' }
+    ],
+    frameRate: 10,
+    repeat: -1
+  });
+  
+  this.anims.create({
+    key: 'enemyAnim',
+    frames: [
+      { key: 'enemy' },
+      { key: 'enemy2' },
+      { key: 'enemy3' },
+      { key: 'enemy2' }
+    ],
+    frameRate: 8,
+    repeat: -1
+  });
+
+  this.cursors = this.input.keyboard.createCursorKeys();
+  
+  this.input.keyboard.on('keydown-SPACE', () => {
+    if (!isDead && !showMenu) {
+      isPaused = !isPaused;
+      if (isPaused) {
+        this.physics.world.pause();
+        if (dustParticles) dustParticles.pause();
+        if (backgroundMusic && !isMuted) backgroundMusic.pause();
+      } else {
+        this.physics.world.resume();
+        if (dustParticles) dustParticles.resume();
+        if (backgroundMusic && !isMuted && !isPaused) backgroundMusic.resume();
+      }
+    }
+  });
+  
+  this.input.keyboard.on('keydown-Q', () => {
+    if (!isDead && !isPaused && !showMenu) {
+      enemiesStopped = !enemiesStopped;
+      enemies.children.iterate(function (enemy) {
+        if (enemy && enemy.body) {
+          if (enemiesStopped) {
+            enemy.body.setVelocityX(0);
+          } else {
+            enemy.body.setVelocityX(enemiesSpeed);
+          }
+        }
+      });
+    }
+  });
+  
+  this.input.keyboard.on('keydown-ESC', () => {
+    if (!isDead) {
+      showMenu = !showMenu;
+      if (showMenu) {
+        this.physics.world.pause();
+        if (dustParticles) dustParticles.pause();
+        if (backgroundMusic && !isMuted) backgroundMusic.pause();
+      } else {
+        if (!isPaused) {
+          this.physics.world.resume();
+          if (dustParticles) dustParticles.resume();
+          if (backgroundMusic && !isMuted) backgroundMusic.resume();
+        }
+      }
+    }
+  });
+  
+  this.input.keyboard.on('keydown-W', () => {
+    if (!isDead && !showMenu) {
+      if (currentWeather === 'rain') {
+        currentWeather = 'lightning';
+        startLightningVisuals.call(this);
+      } else {
+        currentWeather = 'rain';
+        startRainVisuals.call(this);
+      }
+    }
+  });
+
+  enemies = this.physics.add.group({ allowGravity: false });
+
+  // СТОЛКНОВЕНИЕ С ВРАГАМИ
+  this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
+    if (isDead || isPaused || showMenu) return;
+    
+    const enemyType = enemy.getData('type');
+    
+    if (enemyType === 'low') {
+      // Красный враг - урон если на земле (нужно прыгать)
+      if (player.body.blocked.down) {
+        playerHit.call(this);
+      }
+      enemy.destroy();
+    } else {
+      // Фиолетовый враг - урон если не присел (нужно приседать)
+      if (!isCrouching) {
+        playerHit.call(this);
+      }
+      enemy.destroy();
+    }
+  });
+
+  this.time.addEvent({
+    delay: 1400,
+    loop: true,
+    callback: () => {
+      if (isDead || isPaused || showMenu) return;
+      
+      const enemyType = Math.random() > 0.5 ? 'low' : 'high';
+      let enemyY;
+      let enemyColor;
+      let enemyWidth;
+      let enemyHeight;
+      let offsetX;
+      let offsetY;
+      
+      if (enemyType === 'low') {
+        // КРАСНЫЙ - по земле, нужно ПРЫГАТЬ
+        enemyY = this.groundY + 48;
+        enemyColor = 0xff6666;
+        enemyWidth = 320;
+        enemyHeight = 320;
+        offsetX = -35;
+        offsetY = -35;
+      } else {
+        // ФИОЛЕТОВЫЙ - высоко (на уровне головы), нужно ПРИСЕДАТЬ
+        enemyY = this.groundY - 15;
+        enemyColor = 0xaa66ff;
+        enemyWidth = 180;
+        enemyHeight = 180;
+        offsetX = -45;
+        offsetY = -45;
+      }
+      
+      let enemy = enemies.create(850, enemyY, 'enemy');
+      
+      if (!enemiesStopped) {
+        enemy.setVelocityX(enemiesSpeed);
+      } else {
+        enemy.setVelocityX(0);
+      }
+      
+      enemy.setScale(0.2);
+      enemy.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
+      enemy.play('enemyAnim');
+      enemy.setData('type', enemyType);
+      enemy.setTint(enemyColor);
+    },
+    callbackScope: this
+  });
+  
+  updateHeartsDisplay.call(this);
+  
+  menuText = this.add.text(400, 200, '', {
+    fontSize: '20px',
+    fill: '#ffffff',
+    backgroundColor: '#000000',
+    padding: { x: 20, y: 20 },
+    align: 'center'
+  });
+  menuText.setOrigin(0.5);
+  menuText.setDepth(2000);
+  menuText.setVisible(false);
+  
+  lightningFlash = this.add.rectangle(400, 200, 800, 400, 0xffffff, 0);
+  lightningFlash.setDepth(1500);
+  lightningFlash.setVisible(false);
+  
+  startRainVisuals.call(this);
+  createDustParticles.call(this);
+  
+  // МУЗЫКА - запускаем только если ещё не запущена
+  initAudio.call(this);
+}
+
+function initAudio() {
+  try {
+    if (backgroundMusic && backgroundMusic.isPlaying) {
+      console.log('Музыка уже играет');
+      return;
+    }
+    
+    if (backgroundMusic && !backgroundMusic.isPlaying) {
+      if (!isMuted) {
+        backgroundMusic.resume();
+      }
+      return;
+    }
+    
+    backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
+    backgroundMusic.play();
+    musicStarted = true;
+    
+    setupAudioControls();
+  } catch(e) {
+    console.log('Аудио не загружено:', e);
+  }
+}
+
+function setupAudioControls() {
+  const audioControl = document.getElementById('audioControl');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volumeValue = document.getElementById('volumeValue');
+  const audioIcon = document.getElementById('audioIcon');
+  
+  if (volumeSlider && !volumeSlider.hasListener) {
+    volumeSlider.value = currentVolume * 100;
+    volumeValue.textContent = Math.round(currentVolume * 100) + '%';
+    volumeSlider.hasListener = true;
+    
+    volumeSlider.addEventListener('input', (e) => {
+      currentVolume = e.target.value / 100;
+      volumeValue.textContent = e.target.value + '%';
+      if (backgroundMusic) backgroundMusic.setVolume(currentVolume);
+      if (currentVolume === 0) {
+        isMuted = true;
+        audioIcon.textContent = '🔇';
+      } else {
+        isMuted = false;
+        audioIcon.textContent = '🔊';
+      }
+    });
+    
+    audioControl.addEventListener('click', (e) => {
+      if (e.target !== volumeSlider) {
+        if (isMuted) {
+          currentVolume = 0.5;
+          volumeSlider.value = 50;
+          volumeValue.textContent = '50%';
+          if (backgroundMusic) backgroundMusic.setVolume(0.5);
+          audioIcon.textContent = '🔊';
+          isMuted = false;
+        } else {
+          currentVolume = 0;
+          volumeSlider.value = 0;
+          volumeValue.textContent = '0%';
+          if (backgroundMusic) backgroundMusic.setVolume(0);
+          audioIcon.textContent = '🔇';
+          isMuted = true;
+        }
+      }
+    });
+    
+    volumeSlider.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+  }
+}
+
+function createDustParticles() {
+  dustParticles = this.add.particles(0, 0, null, {
+    speed: { min: 20, max: 50 },
+    angle: { min: 150, max: 210 },
+    scale: { start: 0.3, end: 0 },
+    alpha: { start: 0.6, end: 0 },
+    lifespan: 400,
+    quantity: 2,
+    tint: 0x8B7355
+  });
+  
+  const dustGraphics = this.add.graphics();
+  dustGraphics.fillStyle(0x8B7355, 1);
+  dustGraphics.fillCircle(4, 4, 4);
+  dustGraphics.generateTexture('dust', 8, 8);
+  dustGraphics.clear();
+  dustParticles.setTexture('dust');
+  dustParticles.setDepth(800);
+}
+
+function addFootprint(x, y) {
+  if (footprints.length > 30) {
+    const oldest = footprints.shift();
+    oldest.destroy();
+  }
+  const footprint = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5);
+  footprint.setDepth(600);
+  this.tweens.add({
+    targets: footprint,
+    alpha: 0,
+    duration: 5000,
+    onComplete: () => footprint.destroy()
+  });
+  footprints.push(footprint);
+}
+
+function startRainVisuals() {
+  rainDrops.forEach(drop => drop.destroy());
+  rainDrops = [];
+  for (let i = 0; i < 150; i++) {
+    const drop = this.add.rectangle(
+      Math.random() * 800, Math.random() * 400, 2, Math.random() * 8 + 4, 0x88aaff, Math.random() * 0.5 + 0.3
+    );
+    drop.setDepth(500);
+    rainDrops.push(drop);
+  }
+  for (let i = 0; i < 50; i++) {
+    const streak = this.add.rectangle(
+      Math.random() * 800, Math.random() * 400, 1, Math.random() * 15 + 10, 0xaaccff, Math.random() * 0.4 + 0.2
+    );
+    streak.setDepth(501);
+    rainStreaks.push(streak);
+  }
+  this.bg.setTint(0x6688aa);
+  this.bg.setAlpha(0.9);
+}
+
+function startLightningVisuals() {
+  rainDrops.forEach(drop => drop.destroy());
+  rainDrops = [];
+  rainStreaks.forEach(streak => streak.destroy());
+  rainStreaks = [];
+  this.bg.clearTint();
+  this.bg.setAlpha(1);
+  if (lightningTimer) lightningTimer.remove();
+  lightningTimer = this.time.addEvent({ delay: 4000, callback: () => {
+    if (isPaused || showMenu || isDead) return;
+    lightningFlash.setVisible(true);
+    lightningFlash.setAlpha(0.8);
+    this.tweens.add({
+      targets: lightningFlash,
+      alpha: 0,
+      duration: 200,
+      onComplete: () => { lightningFlash.setVisible(false); lightningFlash.setAlpha(0.8); }
+    });
+    this.cameras.main.shake(150, 0.015);
+    
+    const lightningBolt = this.add.graphics();
+    const startX = Math.random() * 800;
+    let currentX = startX;
+    let currentY = 0;
+    lightningBolt.lineStyle(4, 0xffdd88, 1);
+    lightningBolt.beginPath();
+    lightningBolt.moveTo(startX, 0);
+    for (let i = 0; i < 12; i++) {
+      currentX += (Math.random() - 0.5) * 50;
+      currentY += 35;
+      lightningBolt.lineTo(currentX, currentY);
+    }
+    lightningBolt.strokePath();
+    lightningBolt.setDepth(1501);
+    this.time.delayedCall(150, () => lightningBolt.destroy());
+  }, callbackScope: this, loop: true });
+}
+
+function updateHeartsDisplay() {
+  hearts.forEach(heart => heart.destroy());
+  hearts = [];
+  for (let i = 0; i < lives; i++) {
+    const heart = this.add.image(30 + (i * 40), 30, 'heart');
+    heart.setScale(0.5);
+    heart.setDepth(1000);
+    hearts.push(heart);
+  }
+}
+
+function playerHit() {
+  if (isDead || isPaused || showMenu) return;
+  
+  lives--;
+  updateHeartsDisplay.call(this);
+  this.cameras.main.flash(500, 255, 0, 0);
+  
+  if (lives <= 0) {
+    isDead = true;
+    player.stop();
+    player.setTexture('run1');
+    player.setVelocityY(-300);
+    player.setVelocityX(0);
+    player.setTint(0xff0000);
+    this.tweens.add({
+      targets: player,
+      angle: 90,
+      duration: 500,
+      ease: 'Bounce.easeOut'
+    });
+    deathTimer = this.time.delayedCall(1500, () => {
+      this.scene.restart();
+    });
+  } else {
+    isDead = true;
+    player.setTint(0xff0000);
+    player.setVelocityX(-300);
+    player.setVelocityY(-200);
+    
+    enemies.children.iterate(function (enemy) {
+      if (enemy) enemy.destroy();
+    });
+    
+    this.time.delayedCall(1000, () => {
+      isDead = false;
+      player.clearTint();
+      player.setVelocityX(0);
+      this.tweens.add({
+        targets: player,
+        alpha: 0.5,
+        duration: 100,
+        yoyo: true,
+        repeat: 5,
+        onComplete: () => { player.alpha = 1; }
+      });
+    });
+  }
+}
+
+function update() {
+  if (showMenu) {
+    menuText.setVisible(true);
+    menuText.setText(
+      '========== МЕНЮ ==========\n\n' +
+      'УПРАВЛЕНИЕ:\n' +
+      '← → - движение\n' +
+      '↑ - ПРЫЖОК (от красных врагов)\n' +
+      '↓ - ПРИСЕДАНИЕ (от фиолетовых)\n' +
+      'SPACE - пауза\n' +
+      'Q - стоп врагов\n' +
+      'W - смена погоды\n' +
+      'ESC - закрыть меню\n\n' +
+      'ВРАГИ:\n' +
+      '🔴 КРАСНЫЕ (по земле) - ПРЫГАЙ ↑\n' +
+      '🟣 ФИОЛЕТОВЫЕ (голова) - ПРИСЕДАЙ ↓\n\n' +
+      'Нажмите ESC для выхода'
+    );
+  } else {
+    menuText.setVisible(false);
+  }
+  
+  if (isDead || isPaused || showMenu) return;
+
+  if (currentWeather === 'rain') {
+    for (let i = 0; i < rainDrops.length; i++) {
+      rainDrops[i].y += 8;
+      if (rainDrops[i].y > 400) {
+        rainDrops[i].y = -10;
+        rainDrops[i].x = Math.random() * 800;
+      }
+    }
+    for (let i = 0; i < rainStreaks.length; i++) {
+      rainStreaks[i].y += 12;
+      if (rainStreaks[i].y > 400) {
+        rainStreaks[i].y = -20;
+        rainStreaks[i].x = Math.random() * 800;
+      }
+    }
+  }
+
+  // ПРИСЕДАНИЕ
+  const downPressed = this.cursors.down.isDown;
+  const isOnGround = player.body.blocked.down;
+  
+  if (downPressed && isOnGround) {
+    if (!isCrouching) {
+      isCrouching = true;
+      player.body.setSize(55, 35, 1, 23);
+      player.setTexture('crouch');
+      player.setScale(0.25);
+      player.stop();
+      player.setVelocityX(0);
+      if (lastDirection === 'left') {
+        player.setFlipX(true);
+      } else {
+        player.setFlipX(false);
+      }
+    }
+  } else if (!downPressed && isCrouching) {
+    isCrouching = false;
+    player.body.setSize(55, 58, 1, 2);
+    player.setTexture('run1');
+    player.setScale(0.25);
+    if (lastDirection === 'left') {
+      player.setFlipX(true);
+    } else {
+      player.setFlipX(false);
+    }
+  }
+
+  if (isCrouching) {
+    enemies.children.iterate(function (enemy) {
+      if (enemy && enemy.x < -100) {
+        enemy.destroy();
+      }
+    });
+    return;
+  }
+
+  // ДВИЖЕНИЕ
+  let moving = false;
+  player.setVelocityX(0);
+
+  if (this.cursors.left.isDown) {
+    player.setVelocityX(-250);
+    moving = true;
+    lastDirection = 'left';
+    player.setFlipX(true);
+  }
+  
+  if (this.cursors.right.isDown) {
+    player.setVelocityX(250);
+    moving = true;
+    lastDirection = 'right';
+    player.setFlipX(false);
+  }
+
+  if (this.cursors.up.isDown && player.body.blocked.down) {
+    player.setVelocityY(-420);
+    moving = true;
+  }
+
+  if (moving && isOnGround && !isCrouching) {
+    if (dustParticles) {
+      dustParticles.emitParticleAt(player.x - 15, player.y + 20);
+      dustParticles.emitParticleAt(player.x + 15, player.y + 20);
+    }
+    footprintDelay++;
+    if (footprintDelay > 15) {
+      footprintDelay = 0;
+      addFootprint.call(this, player.x, player.y);
+    }
+  }
+
+  if (moving) {
+    if (!player.anims.isPlaying) {
+      player.play('run');
+    }
+  } else {
+    if (player.anims.isPlaying) {
+      player.stop();
+    }
+    player.setTexture('run1');
+    if (lastDirection === 'left') {
+      player.setFlipX(true);
+    } else {
+      player.setFlipX(false);
+    }
+  }
+
+  enemies.children.iterate(function (enemy) {
+    if (enemy && enemy.x < -100) {
+      enemy.destroy();
+    }
+  });
+}
+</script>
+
+</body>
+</html>
