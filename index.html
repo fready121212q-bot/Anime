@@ -2,9 +2,14 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Runner Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Runner Game - Mobile Edition</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
+    * {
+      touch-action: none; /* Предотвращает прокрутку страницы при свайпах */
+    }
+    
     .audio-control {
       position: fixed;
       top: 10px;
@@ -53,6 +58,186 @@
       min-width: 35px;
       text-align: center;
     }
+    
+    /* Мобильные кнопки управления */
+    .mobile-controls {
+      position: fixed;
+      bottom: 20px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 2000;
+      pointer-events: none;
+    }
+    
+    .control-panel {
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(10px);
+      border-radius: 60px;
+      padding: 12px 20px;
+      display: flex;
+      gap: 15px;
+      pointer-events: auto;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+    
+    .control-btn {
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+      border: 2px solid rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 30px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+      touch-action: manipulation;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .control-btn:active {
+      transform: scale(0.95);
+      background: rgba(255,255,255,0.4);
+    }
+    
+    .action-buttons {
+      display: flex;
+      gap: 15px;
+    }
+    
+    .action-btn {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      border: 2px solid rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 28px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      user-select: none;
+      touch-action: manipulation;
+      color: white;
+      font-weight: bold;
+    }
+    
+    .action-btn:active {
+      transform: scale(0.95);
+      background: rgba(255,255,255,0.3);
+    }
+    
+    .jump-btn {
+      background: rgba(76, 175, 80, 0.7);
+      border-color: #4CAF50;
+    }
+    
+    .crouch-btn {
+      background: rgba(255, 152, 0, 0.7);
+      border-color: #FF9800;
+    }
+    
+    .pause-btn {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.7);
+      border: 2px solid rgba(255,255,255,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 2000;
+      pointer-events: auto;
+      color: white;
+    }
+    
+    .swipe-indicator {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 40px;
+      color: white;
+      text-shadow: 0 0 10px rgba(0,0,0,0.5);
+      pointer-events: none;
+      z-index: 3000;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    
+    @media (max-width: 768px) {
+      .control-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+      }
+      .action-btn {
+        width: 60px;
+        height: 60px;
+        font-size: 24px;
+      }
+      .control-panel {
+        padding: 8px 15px;
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .control-btn {
+        width: 45px;
+        height: 45px;
+        font-size: 20px;
+      }
+      .action-btn {
+        width: 55px;
+        height: 55px;
+        font-size: 20px;
+      }
+    }
+    
+    /* Инструкция для мобильных */
+    .mobile-tutorial {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.9);
+      color: white;
+      padding: 20px;
+      border-radius: 15px;
+      text-align: center;
+      z-index: 4000;
+      font-family: Arial, sans-serif;
+      max-width: 80%;
+      pointer-events: none;
+      animation: fadeOut 3s forwards;
+    }
+    
+    @keyframes fadeOut {
+      0% { opacity: 1; }
+      70% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; }
+    }
+    
+    .mobile-tutorial h3 {
+      margin: 0 0 10px 0;
+    }
+    
+    .mobile-tutorial p {
+      margin: 5px 0;
+      font-size: 14px;
+    }
   </style>
 </head>
 
@@ -62,6 +247,28 @@
   <div class="audio-icon" id="audioIcon">🔊</div>
   <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
   <div class="volume-value" id="volumeValue">50%</div>
+</div>
+
+<!-- Мобильные элементы управления -->
+<div class="mobile-controls">
+  <div class="control-panel">
+    <div class="control-btn" id="moveLeftBtn">←</div>
+    <div class="control-btn" id="moveRightBtn">→</div>
+  </div>
+  <div class="action-buttons">
+    <div class="action-btn jump-btn" id="jumpBtn">↑</div>
+    <div class="action-btn crouch-btn" id="crouchBtn">↓</div>
+  </div>
+</div>
+<div class="pause-btn" id="pauseBtn">⏸</div>
+<div class="swipe-indicator" id="swipeIndicator">👆</div>
+<div class="mobile-tutorial" id="mobileTutorial">
+  <h3>📱 Управление на телефоне</h3>
+  <p>⬅️ ➡️ - Кнопки для движения</p>
+  <p>⬆️ - Прыжок (от красных врагов)</p>
+  <p>⬇️ - Приседание (от фиолетовых)</p>
+  <p>🤚 Свайп вверх/вниз по экрану</p>
+  <p>⏸ - Пауза/Меню</p>
 </div>
 
 <script>
@@ -94,6 +301,17 @@ let currentWeather = 'rain';
 let dustParticles;
 let footprints = [];
 let footprintDelay = 0;
+
+// Мобильные контроллеры
+let touchStartY = 0;
+let touchEndY = 0;
+let touchStartX = 0;
+let touchEndX = 0;
+let minSwipeDistance = 50;
+let moveLeftActive = false;
+let moveRightActive = false;
+let jumpActive = false;
+let crouchActive = false;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -182,6 +400,7 @@ function create() {
 
   this.cursors = this.input.keyboard.createCursorKeys();
   
+  // Клавиатурное управление (для отладки на ПК)
   this.input.keyboard.on('keydown-SPACE', () => {
     if (!isDead && !showMenu) {
       isPaused = !isPaused;
@@ -335,6 +554,154 @@ function create() {
   
   // МУЗЫКА - запускаем только если ещё не запущена
   initAudio.call(this);
+  
+  // Настройка мобильного управления
+  setupMobileControls.call(this);
+}
+
+function setupMobileControls() {
+  // Получаем элементы управления
+  const moveLeftBtn = document.getElementById('moveLeftBtn');
+  const moveRightBtn = document.getElementById('moveRightBtn');
+  const jumpBtn = document.getElementById('jumpBtn');
+  const crouchBtn = document.getElementById('crouchBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const swipeIndicator = document.getElementById('swipeIndicator');
+  
+  // Обработка касаний для кнопок движения
+  if (moveLeftBtn) {
+    moveLeftBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      moveLeftActive = true;
+      moveLeftBtn.style.transform = 'scale(0.95)';
+    });
+    moveLeftBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      moveLeftActive = false;
+      moveLeftBtn.style.transform = 'scale(1)';
+    });
+    moveLeftBtn.addEventListener('touchcancel', (e) => {
+      moveLeftActive = false;
+      moveLeftBtn.style.transform = 'scale(1)';
+    });
+  }
+  
+  if (moveRightBtn) {
+    moveRightBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      moveRightActive = true;
+      moveRightBtn.style.transform = 'scale(0.95)';
+    });
+    moveRightBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      moveRightActive = false;
+      moveRightBtn.style.transform = 'scale(1)';
+    });
+    moveRightBtn.addEventListener('touchcancel', (e) => {
+      moveRightActive = false;
+      moveRightBtn.style.transform = 'scale(1)';
+    });
+  }
+  
+  if (jumpBtn) {
+    jumpBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      jumpActive = true;
+      jumpBtn.style.transform = 'scale(0.95)';
+      setTimeout(() => { jumpActive = false; }, 100);
+    });
+    jumpBtn.addEventListener('touchend', (e) => {
+      jumpActive = false;
+      jumpBtn.style.transform = 'scale(1)';
+    });
+  }
+  
+  if (crouchBtn) {
+    crouchBtn.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      crouchActive = true;
+      crouchBtn.style.transform = 'scale(0.95)';
+    });
+    crouchBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      crouchActive = false;
+      crouchBtn.style.transform = 'scale(1)';
+    });
+    crouchBtn.addEventListener('touchcancel', (e) => {
+      crouchActive = false;
+      crouchBtn.style.transform = 'scale(1)';
+    });
+  }
+  
+  if (pauseBtn) {
+    pauseBtn.addEventListener('click', () => {
+      if (!isDead && !showMenu) {
+        isPaused = !isPaused;
+        if (isPaused) {
+          if (game.scene.scenes[0]) game.scene.scenes[0].physics.world.pause();
+          if (dustParticles) dustParticles.pause();
+          if (backgroundMusic && !isMuted) backgroundMusic.pause();
+          pauseBtn.textContent = '▶';
+        } else {
+          if (game.scene.scenes[0]) game.scene.scenes[0].physics.world.resume();
+          if (dustParticles) dustParticles.resume();
+          if (backgroundMusic && !isMuted) backgroundMusic.resume();
+          pauseBtn.textContent = '⏸';
+        }
+      }
+    });
+  }
+  
+  // Свайп управление
+  let swipeStartTime = 0;
+  
+  document.body.addEventListener('touchstart', (e) => {
+    if (isPaused || showMenu || isDead) return;
+    touchStartY = e.touches[0].clientY;
+    touchStartX = e.touches[0].clientX;
+    swipeStartTime = Date.now();
+  });
+  
+  document.body.addEventListener('touchend', (e) => {
+    if (isPaused || showMenu || isDead) return;
+    touchEndY = e.changedTouches[0].clientY;
+    touchEndX = e.changedTouches[0].clientX;
+    
+    const deltaY = touchEndY - touchStartY;
+    const deltaX = Math.abs(touchEndX - touchStartX);
+    const deltaTime = Date.now() - swipeStartTime;
+    
+    // Проверяем, что это вертикальный свайп и не слишком медленный
+    if (Math.abs(deltaY) > minSwipeDistance && deltaX < 100 && deltaTime < 500) {
+      if (deltaY < 0) {
+        // Свайп вверх - прыжок
+        jumpActive = true;
+        setTimeout(() => { jumpActive = false; }, 100);
+        showSwipeIndicator('⬆️');
+      } else if (deltaY > 0) {
+        // Свайп вниз - приседание
+        crouchActive = true;
+        setTimeout(() => { crouchActive = false; }, 200);
+        showSwipeIndicator('⬇️');
+      }
+    }
+  });
+  
+  function showSwipeIndicator(icon) {
+    if (swipeIndicator) {
+      swipeIndicator.textContent = icon;
+      swipeIndicator.style.opacity = '1';
+      setTimeout(() => {
+        swipeIndicator.style.opacity = '0';
+      }, 300);
+    }
+  }
+  
+  // Скрываем туториал через 5 секунд
+  setTimeout(() => {
+    const tutorial = document.getElementById('mobileTutorial');
+    if (tutorial) tutorial.style.display = 'none';
+  }, 5000);
 }
 
 function initAudio() {
@@ -575,6 +942,7 @@ function update() {
       '← → - движение\n' +
       '↑ - ПРЫЖОК (от красных врагов)\n' +
       '↓ - ПРИСЕДАНИЕ (от фиолетовых)\n' +
+      '🤚 Свайп вверх/вниз по экрану\n' +
       'SPACE - пауза\n' +
       'Q - стоп врагов\n' +
       'W - смена погоды\n' +
@@ -607,8 +975,8 @@ function update() {
     }
   }
 
-  // ПРИСЕДАНИЕ
-  const downPressed = this.cursors.down.isDown;
+  // ПРИСЕДАНИЕ (объединяем клавиатуру и мобильные кнопки)
+  const downPressed = this.cursors.down.isDown || crouchActive;
   const isOnGround = player.body.blocked.down;
   
   if (downPressed && isOnGround) {
@@ -646,27 +1014,28 @@ function update() {
     return;
   }
 
-  // ДВИЖЕНИЕ
+  // ДВИЖЕНИЕ (объединяем клавиатуру и мобильные кнопки)
   let moving = false;
   player.setVelocityX(0);
 
-  if (this.cursors.left.isDown) {
+  if (this.cursors.left.isDown || moveLeftActive) {
     player.setVelocityX(-250);
     moving = true;
     lastDirection = 'left';
     player.setFlipX(true);
   }
   
-  if (this.cursors.right.isDown) {
+  if (this.cursors.right.isDown || moveRightActive) {
     player.setVelocityX(250);
     moving = true;
     lastDirection = 'right';
     player.setFlipX(false);
   }
 
-  if (this.cursors.up.isDown && player.body.blocked.down) {
-    player.setVelocityY(-420);
+  if ((this.cursors.up.isDown || jumpActive) && player.body.blocked.down) {
+    player.setVelocityY(-260);
     moving = true;
+    jumpActive = false;
   }
 
   if (moving && isOnGround && !isCrouching) {
