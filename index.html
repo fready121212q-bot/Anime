@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Круговой таймер бонуса</title>
+  <title>Runner Game — Круговой таймер с кроссовком</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -191,9 +191,10 @@ let doubleJumpActive = false;
 let doubleJumpTimer = null;
 let bonusSpawnTimer = null;
 let canDoubleJump = false;
-let bonusTimerGraphic = null; // круговой таймер
+let bonusTimerGraphic = null;
+let bonusIcon = null;
 let bonusStartTime = 0;
-const BONUS_DURATION = 15000; // 15 секунд
+const BONUS_DURATION = 15000;
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -337,7 +338,6 @@ function create() {
     monster.destroy();
   });
 
-  // Генерация бонусов (кроссовок уменьшен до scale 0.1)
   bonusSpawnTimer = this.time.addEvent({
     delay: 8000,
     loop: true,
@@ -347,7 +347,7 @@ function create() {
       if (Math.random() < 0.35) {
         const bonusX = Math.random() * 600 + 100;
         let bonus = bonuses.create(bonusX, 50, 'sneaker');
-        bonus.setScale(0.1); // Уменьшен в 2 раза (было 0.2)
+        bonus.setScale(0.1);
         bonus.body.setSize(15, 15, 5, 5);
         bonus.body.setCollideWorldBounds(true);
         bonus.setBounce(0.2);
@@ -357,7 +357,6 @@ function create() {
     callbackScope: this
   });
 
-  // Генерация врагов
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -444,11 +443,18 @@ function create() {
 }
 
 function createBonusTimer() {
-  if (bonusTimerGraphic) bonusTimerGraphic.destroy();
+  if (bonusTimerGraphic) {
+    bonusTimerGraphic.destroy();
+    bonusTimerGraphic = null;
+  }
+  if (bonusIcon) {
+    bonusIcon.destroy();
+    bonusIcon = null;
+  }
   
-  const radius = 35;
+  const radius = 18; // Уменьшенный радиус (в 2 раза меньше предыдущего 35)
   const x = player.x;
-  const y = player.y - 55;
+  const y = player.y - 65; // Выше над головой
   
   bonusTimerGraphic = this.add.graphics();
   bonusTimerGraphic.setDepth(550);
@@ -456,17 +462,27 @@ function createBonusTimer() {
   bonusTimerGraphic.y = y;
   
   // Фон круга
-  bonusTimerGraphic.fillStyle(0x000000, 0.6);
-  bonusTimerGraphic.fillCircle(0, 0, radius + 2);
+  bonusTimerGraphic.fillStyle(0x000000, 0.7);
+  bonusTimerGraphic.fillCircle(0, 0, radius + 3);
   bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.8);
   bonusTimerGraphic.strokeCircle(0, 0, radius);
+  
+  // Иконка кроссовка в центре круга
+  bonusIcon = this.add.image(x, y, 'sneaker');
+  bonusIcon.setScale(0.12);
+  bonusIcon.setDepth(551);
+  bonusIcon.setTint(0xffdd88);
 }
 
 function updateBonusTimer() {
-  if (!doubleJumpActive || !bonusTimerGraphic) {
+  if (!doubleJumpActive) {
     if (bonusTimerGraphic) {
       bonusTimerGraphic.destroy();
       bonusTimerGraphic = null;
+    }
+    if (bonusIcon) {
+      bonusIcon.destroy();
+      bonusIcon = null;
     }
     return;
   }
@@ -480,32 +496,44 @@ function updateBonusTimer() {
       bonusTimerGraphic.destroy();
       bonusTimerGraphic = null;
     }
+    if (bonusIcon) {
+      bonusIcon.destroy();
+      bonusIcon = null;
+    }
     return;
   }
   
-  // Обновляем позицию таймера над игроком
-  bonusTimerGraphic.x = player.x;
-  bonusTimerGraphic.y = player.y - 55;
+  const radius = 18;
+  const x = player.x;
+  const y = player.y - 65;
   
-  // Перерисовываем дугу
-  bonusTimerGraphic.clear();
+  // Обновляем позицию
+  if (bonusTimerGraphic) {
+    bonusTimerGraphic.x = x;
+    bonusTimerGraphic.y = y;
+    
+    // Перерисовываем
+    bonusTimerGraphic.clear();
+    
+    // Фон
+    bonusTimerGraphic.fillStyle(0x000000, 0.7);
+    bonusTimerGraphic.fillCircle(0, 0, radius + 3);
+    bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.5);
+    bonusTimerGraphic.strokeCircle(0, 0, radius);
+    
+    // Убывающая дуга
+    const angle = 360 * percent;
+    bonusTimerGraphic.lineStyle(3, 0xffaa44, 1);
+    bonusTimerGraphic.beginPath();
+    bonusTimerGraphic.arc(0, 0, radius - 2, 0, (angle * Math.PI) / 180, false);
+    bonusTimerGraphic.strokePath();
+  }
   
-  // Фон
-  bonusTimerGraphic.fillStyle(0x000000, 0.6);
-  bonusTimerGraphic.fillCircle(0, 0, 37);
-  bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.5);
-  bonusTimerGraphic.strokeCircle(0, 0, 35);
-  
-  // Убывающая дуга
-  const angle = 360 * percent;
-  bonusTimerGraphic.lineStyle(4, 0xffaa44, 1);
-  bonusTimerGraphic.beginPath();
-  bonusTimerGraphic.arc(0, 0, 32, 0, (angle * Math.PI) / 180, false);
-  bonusTimerGraphic.strokePath();
-  
-  // Маленький кружок в центре
-  bonusTimerGraphic.fillStyle(0xffaa44, 0.8);
-  bonusTimerGraphic.fillCircle(0, 0, 5);
+  // Обновляем позицию иконки
+  if (bonusIcon) {
+    bonusIcon.x = x;
+    bonusIcon.y = y;
+  }
 }
 
 function activateDoubleJumpBonus() {
@@ -549,6 +577,10 @@ function activateDoubleJumpBonus() {
     if (bonusTimerGraphic) {
       bonusTimerGraphic.destroy();
       bonusTimerGraphic = null;
+    }
+    if (bonusIcon) {
+      bonusIcon.destroy();
+      bonusIcon = null;
     }
     this.cameras.main.flash(300, 255, 200, 0);
   }, [], this);
@@ -831,10 +863,7 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
-  // Обновление кругового таймера
-  if (doubleJumpActive) {
-    updateBonusTimer.call(this);
-  }
+  updateBonusTimer.call(this);
 
   if (doubleJumpActive && (this.cursors.left.isDown || this.cursors.right.isDown || touchLeft || touchRight) && player.body.blocked.down) {
     if (Math.random() < 0.1) {
