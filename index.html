@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (SLIDING FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (CROUCH AFTER JUMP FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -178,6 +178,10 @@ let touchRight = false;
 let jumpCooldown = false;
 let touchCrouchActive = false;
 
+// Флаг для отслеживания, что игрок только что приземлился
+let justLanded = false;
+let justLandedTimer = null;
+
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   scale: {
@@ -223,6 +227,7 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
+  justLanded = false;
 
   this.groundY = 320;
 
@@ -508,15 +513,16 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // ПРИСЕДАНИЕ - исправлено, теперь НЕ ДВИГАЕТСЯ в стороны
+  // ПРИСЕДАНИЕ - с проверкой на приземление
   const applyCrouch = () => {
     if (!player || !player.body) return;
-    if (player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
+    // Проверяем, что игрок на земле ИЛИ только что приземлился (justLanded)
+    const isOnGround = player.body.blocked.down;
+    if ((isOnGround || justLanded) && !isCrouching && !isDead && !isPaused && !showMenu) {
       isCrouching = true;
       player.body.setSize(55, 35, 1, 23);
       player.setTexture('crouch');
       player.stop();
-      // ВАЖНО: обнуляем скорость по X, чтобы не скользить
       player.setVelocityX(0);
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
@@ -528,7 +534,6 @@ function setupMobileControls() {
       isCrouching = false;
       player.body.setSize(55, 58, 1, 2);
       player.setTexture('run1');
-      // Не обнуляем скорость здесь, чтобы можно было продолжить движение
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
     }
@@ -607,17 +612,26 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
+  const wasOnGround = player.body.blocked.down;
   const isOnGround = player.body.blocked.down;
   
-  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ
+  // Отслеживаем момент приземления
+  if (!wasOnGround && isOnGround) {
+    justLanded = true;
+    if (justLandedTimer) clearTimeout(justLandedTimer);
+    justLandedTimer = setTimeout(() => {
+      justLanded = false;
+    }, 150); // 150 мс окно после приземления, когда можно присесть
+  }
+  
+  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (с учетом justLanded)
   const downKeyPressed = this.cursors.down.isDown;
   
-  if (downKeyPressed && isOnGround && !isCrouching && !touchCrouchActive) {
+  if (downKeyPressed && (isOnGround || justLanded) && !isCrouching && !touchCrouchActive) {
     isCrouching = true;
     player.body.setSize(55, 35, 1, 23);
     player.setTexture('crouch');
     player.stop();
-    // Обнуляем скорость чтобы не скользить
     player.setVelocityX(0);
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
@@ -630,9 +644,8 @@ function update() {
     else player.setFlipX(false);
   }
   
-  // Если в приседе - полностью блокируем движение и НЕ применяем velocityX
+  // Если в приседе - полностью блокируем движение
   if (isCrouching) {
-    // Гарантированно обнуляем скорость по X, чтобы не было скольжения
     player.setVelocityX(0);
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
@@ -688,4 +701,5 @@ function update() {
 }
 </script>
 </body>
+</html>
 </html>
