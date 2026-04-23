@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Счётчик уклонений (ИСПРАВЛЕН)</title>
+  <title>Runner Game — Счётчик уклонений (РАБОТАЕТ)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -167,10 +167,6 @@ let currentVolume = 0.5;
 let score = 0;
 let scoreText;
 
-// Для отслеживания успешно пройденных врагов
-let passedEnemies = new Set();
-let passedSpecialEnemies = new Set();
-
 let rainDrops = [];
 let rainStreaks = [];
 let lightningFlash;
@@ -185,6 +181,9 @@ let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
 let touchCrouchActive = false;
+
+// Для отслеживания уже начисленных очков за врага
+let scoredEnemies = new Set();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -232,8 +231,7 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
-  passedEnemies.clear();
-  passedSpecialEnemies.clear();
+  scoredEnemies.clear();
 
   this.groundY = 320;
 
@@ -274,7 +272,7 @@ function create() {
   enemies = this.physics.add.group({ allowGravity: false });
   specialEnemies = this.physics.add.group({ allowGravity: false });
 
-  // Столкновение с обычными врагами - только нанесение урона
+  // Столкновение с обычными врагами
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     const enemyType = enemy.getData('type');
@@ -288,7 +286,6 @@ function create() {
         playerHit.call(this);
       }
     }
-    // Враг уничтожается при столкновении в любом случае
     enemy.destroy();
   });
 
@@ -308,32 +305,6 @@ function create() {
       }
     }
     monster.destroy();
-  });
-
-  // Отслеживание врагов, которые покинули экран слева (обычные)
-  this.physics.world.on('worldbounds', (body) => {
-    const gameObject = body.gameObject;
-    if (gameObject && (gameObject === enemies.getChildren().find(e => e === gameObject))) {
-      if (body.position.x < -100 && !passedEnemies.has(gameObject)) {
-        passedEnemies.add(gameObject);
-        score++;
-        updateScoreDisplay.call(this);
-        this.cameras.main.flash(80, 100, 255, 100);
-      }
-    }
-  });
-
-  // Отслеживание золотых/серебряных монстров, которые покинули экран справа
-  this.physics.world.on('worldbounds', (body) => {
-    const gameObject = body.gameObject;
-    if (gameObject && (gameObject === specialEnemies.getChildren().find(m => m === gameObject))) {
-      if (body.position.x > 900 && !passedSpecialEnemies.has(gameObject)) {
-        passedSpecialEnemies.add(gameObject);
-        score++;
-        updateScoreDisplay.call(this);
-        this.cameras.main.flash(80, 255, 215, 100);
-      }
-    }
   });
 
   // Генерация обычных врагов (справа налево)
@@ -360,7 +331,8 @@ function create() {
       enemy.play('enemyAnim');
       enemy.setData('type', enemyType);
       enemy.setTint(enemyType === 'low' ? 0xff6666 : 0xaa66ff);
-      enemy.body.world.onWorldBounds = true;
+      // Уникальный ID для отслеживания
+      enemy.setData('scored', false);
     },
     callbackScope: this
   });
@@ -399,7 +371,7 @@ function create() {
       monster.setData('type', monsterType);
       monster.setTint(tintColor);
       monster.setFlipX(true);
-      monster.body.world.onWorldBounds = true;
+      monster.setData('scored', false);
     },
     callbackScope: this
   });
@@ -657,6 +629,27 @@ function update() {
     for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
+
+  // НАЧИСЛЕНИЕ ОЧКОВ ЗА УСПЕШНО ПРОЙДЕННЫХ ВРАГОВ
+  // Обычные враги (справа налево) - начисляем когда x < -100
+  enemies.children.iterate(enemy => {
+    if (enemy && enemy.x < -100 && !enemy.getData('scored')) {
+      enemy.setData('scored', true);
+      score++;
+      updateScoreDisplay.call(this);
+      this.cameras.main.flash(80, 100, 255, 100);
+    }
+  });
+  
+  // Золотые/серебряные монстры (слева направо) - начисляем когда x > 900
+  specialEnemies.children.iterate(monster => {
+    if (monster && monster.x > 900 && !monster.getData('scored')) {
+      monster.setData('scored', true);
+      score++;
+      updateScoreDisplay.call(this);
+      this.cameras.main.flash(80, 255, 215, 100);
+    }
+  });
 
   const isOnGround = player.body.blocked.down;
   const downKeyPressed = this.cursors.down.isDown;
