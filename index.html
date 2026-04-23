@@ -7,7 +7,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
-      touch-action: none; /* Предотвращает прокрутку страницы при свайпах */
+      touch-action: none; /* Предотвращает прокрутку страницы при касаниях */
     }
     
     .audio-control {
@@ -94,17 +94,17 @@
       justify-content: center;
       font-size: 30px;
       cursor: pointer;
-      transition: none; /* Убираем анимацию при нажатии */
+      transition: none;
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
-      -webkit-tap-highlight-color: transparent; /* Убираем подсветку на iOS */
+      -webkit-tap-highlight-color: transparent;
     }
     
     .control-btn:active {
-      transform: none; /* Убираем трансформацию при нажатии */
-      background: rgba(255,255,255,0.2); /* Оставляем тот же фон */
+      transform: none;
+      background: rgba(255,255,255,0.2);
     }
     
     .action-buttons {
@@ -123,17 +123,17 @@
       justify-content: center;
       font-size: 28px;
       cursor: pointer;
-      transition: none; /* Убираем анимацию при нажатии */
+      transition: none;
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
-      -webkit-tap-highlight-color: transparent; /* Убираем подсветку на iOS */
+      -webkit-tap-highlight-color: transparent;
     }
     
     .action-btn:active {
-      transform: none; /* Убираем трансформацию при нажатии */
-      background: rgba(0,0,0,0.7); /* Оставляем тот же фон */
+      transform: none;
+      background: rgba(0,0,0,0.7);
     }
     
     .jump-btn {
@@ -171,20 +171,6 @@
     
     .pause-btn:active {
       transform: none;
-    }
-    
-    .swipe-indicator {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font-size: 40px;
-      color: white;
-      text-shadow: 0 0 10px rgba(0,0,0,0.5);
-      pointer-events: none;
-      z-index: 3000;
-      opacity: 0;
-      transition: opacity 0.2s ease;
     }
     
     @media (max-width: 768px) {
@@ -317,13 +303,11 @@
   </div>
 </div>
 <div class="pause-btn" id="pauseBtn">⏸</div>
-<div class="swipe-indicator" id="swipeIndicator">👆</div>
 <div class="mobile-tutorial" id="mobileTutorial">
   <h3>🎮 Управление на телефоне</h3>
-  <p>⬅️ ➡️ - Кнопки для движения</p>
-  <p>⬆️ - Прыжок (от красных врагов)</p>
-  <p>⬇️ - Приседание (от фиолетовых)</p>
-  <p>🤚 Свайп вверх/вниз по экрану</p>
+  <p>⬅️ ➡️ - Движение (удерживать)</p>
+  <p>⬆️ - Прыжок (нажать)</p>
+  <p>⬇️ - Приседание (удерживать)</p>
   <p>⏸ - Пауза/Меню</p>
   <p>🔊 - Регулировка громкости</p>
 </div>
@@ -364,14 +348,9 @@ let footprints = [];
 let footprintDelay = 0;
 
 // Мобильные контроллеры
-let touchStartY = 0;
-let touchEndY = 0;
-let touchStartX = 0;
-let touchEndX = 0;
-let minSwipeDistance = 50;
 let moveLeftActive = false;
 let moveRightActive = false;
-let jumpActive = false;
+let jumpRequested = false;
 let crouchActive = false;
 
 const game = new Phaser.Game({
@@ -625,10 +604,9 @@ function setupMobileControls() {
   const jumpBtn = document.getElementById('jumpBtn');
   const crouchBtn = document.getElementById('crouchBtn');
   const pauseBtn = document.getElementById('pauseBtn');
-  const swipeIndicator = document.getElementById('swipeIndicator');
   const musicLaunchBtn = document.getElementById('musicLaunchBtn');
   
-  // Обработка касаний для кнопок движения (без визуальных эффектов)
+  // Левая кнопка - удержание для движения влево
   if (moveLeftBtn) {
     moveLeftBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -643,6 +621,7 @@ function setupMobileControls() {
     });
   }
   
+  // Правая кнопка - удержание для движения вправо
   if (moveRightBtn) {
     moveRightBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -657,21 +636,19 @@ function setupMobileControls() {
     });
   }
   
+  // Кнопка прыжка - однократное нажатие
   if (jumpBtn) {
     jumpBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
-      jumpActive = true;
-      // Сбрасываем через короткое время, чтобы прыжок произошел только один раз
-      setTimeout(() => { 
-        jumpActive = false; 
-      }, 200);
+      jumpRequested = true;
     });
     jumpBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
-      // Не сбрасываем сразу, чтобы прыжок точно произошел
+      // Не сбрасываем сразу, даем время на обработку в update
     });
   }
   
+  // Кнопка приседания - удержание
   if (crouchBtn) {
     crouchBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
@@ -686,6 +663,7 @@ function setupMobileControls() {
     });
   }
   
+  // Кнопка паузы
   if (pauseBtn) {
     pauseBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -714,51 +692,6 @@ function setupMobileControls() {
       initAudio.call(gameScene);
       musicLaunchBtn.style.display = 'none';
     });
-  }
-  
-  // Свайп управление
-  let swipeStartTime = 0;
-  
-  document.body.addEventListener('touchstart', (e) => {
-    if (isPaused || showMenu || isDead) return;
-    touchStartY = e.touches[0].clientY;
-    touchStartX = e.touches[0].clientX;
-    swipeStartTime = Date.now();
-  });
-  
-  document.body.addEventListener('touchend', (e) => {
-    if (isPaused || showMenu || isDead) return;
-    touchEndY = e.changedTouches[0].clientY;
-    touchEndX = e.changedTouches[0].clientX;
-    
-    const deltaY = touchEndY - touchStartY;
-    const deltaX = Math.abs(touchEndX - touchStartX);
-    const deltaTime = Date.now() - swipeStartTime;
-    
-    // Проверяем, что это вертикальный свайп и не слишком медленный
-    if (Math.abs(deltaY) > minSwipeDistance && deltaX < 100 && deltaTime < 500) {
-      if (deltaY < 0) {
-        // Свайп вверх - прыжок
-        jumpActive = true;
-        setTimeout(() => { jumpActive = false; }, 200);
-        showSwipeIndicator('⬆️');
-      } else if (deltaY > 0) {
-        // Свайп вниз - приседание
-        crouchActive = true;
-        setTimeout(() => { crouchActive = false; }, 300);
-        showSwipeIndicator('⬇️');
-      }
-    }
-  });
-  
-  function showSwipeIndicator(icon) {
-    if (swipeIndicator) {
-      swipeIndicator.textContent = icon;
-      swipeIndicator.style.opacity = '1';
-      setTimeout(() => {
-        swipeIndicator.style.opacity = '0';
-      }, 300);
-    }
   }
   
   // Скрываем туториал через 5 секунд
@@ -1019,10 +952,9 @@ function update() {
     menuText.setText(
       '========== МЕНЮ ==========\n\n' +
       'УПРАВЛЕНИЕ:\n' +
-      '← → - движение\n' +
-      '↑ - ПРЫЖОК (от красных врагов)\n' +
-      '↓ - ПРИСЕДАНИЕ (от фиолетовых)\n' +
-      '🤚 Свайп вверх/вниз по экрану\n' +
+      '← → - движение (удерживать)\n' +
+      '↑ - ПРЫЖОК (нажать)\n' +
+      '↓ - ПРИСЕДАНИЕ (удерживать)\n' +
       'SPACE - пауза\n' +
       'Q - стоп врагов\n' +
       'W - смена погоды\n' +
@@ -1055,7 +987,7 @@ function update() {
     }
   }
 
-  // ПРИСЕДАНИЕ (объединяем клавиатуру и мобильные кнопки)
+  // ПРИСЕДАНИЕ (удержание кнопки)
   const downPressed = this.cursors.down.isDown || crouchActive;
   const isOnGround = player.body.blocked.down;
   
@@ -1094,7 +1026,7 @@ function update() {
     return;
   }
 
-  // ДВИЖЕНИЕ (объединяем клавиатуру и мобильные кнопки)
+  // ДВИЖЕНИЕ (удержание кнопок)
   let moving = false;
   player.setVelocityX(0);
 
@@ -1112,10 +1044,11 @@ function update() {
     player.setFlipX(false);
   }
 
-  if ((this.cursors.up.isDown || jumpActive) && player.body.blocked.down) {
+  // ПРЫЖОК (однократное нажатие)
+  if ((this.cursors.up.isDown || jumpRequested) && player.body.blocked.down) {
     player.setVelocityY(-260);
     moving = true;
-    jumpActive = false;
+    jumpRequested = false; // Сбрасываем запрос на прыжок
   }
 
   if (moving && isOnGround && !isCrouching) {
