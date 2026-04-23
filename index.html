@@ -3,7 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — 6 огненных шаров (опущены ниже)</title>
+  <title>Цукихимэ — Лунная принцесса</title>
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" sizes="128x128" href="favicon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon.png">
+  <link rel="shortcut icon" type="image/png" href="favicon.png">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🌙%3C/text%3E%3C/svg%3E">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * { user-select: none; touch-action: manipulation; }
@@ -27,15 +33,16 @@
   </style>
 </head>
 <body>
-<div class="top-panel"><div class="top-buttons"><button id="btnPause">⏸️ ПАУЗА</button><button id="btnStopEnemies">⏹️ СТОП</button><button id="btnWeather">🌦️ ПОГОДА</button><button id="btnMenu">📜 МЕНЮ</button></div><div class="volume-control"><div class="volume-icon" id="audioIcon">🔊</div><input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50"><div class="volume-value" id="volumeValue">50%</div></div></div>
-<div class="touch-panel"><div class="move-group"><button id="btnLeft">◀</button><button id="btnRight">▶</button></div><div class="action-group"><button id="btnJump">▲</button><button id="btnCrouch">▼</button></div></div>
+<div class="top-panel" id="topPanel" style="display: none;"><div class="top-buttons"><button id="btnPause">⏸️ ПАУЗА</button><button id="btnStopEnemies">⏹️ СТОП</button><button id="btnWeather">🌦️ ПОГОДА</button><button id="btnMenu">📜 МЕНЮ</button></div><div class="volume-control"><div class="volume-icon" id="audioIcon">🔊</div><input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="10"><div class="volume-value" id="volumeValue">10%</div></div></div>
+<div class="touch-panel" id="touchPanel" style="display: none;"><div class="move-group"><button id="btnLeft">◀</button><button id="btnRight">▶</button></div><div class="action-group"><button id="btnJump">▲</button><button id="btnCrouch">▼</button></div></div>
+
 <script>
 const config = { type: Phaser.AUTO, scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH, width: 800, height: 400 }, physics: { default: 'arcade', arcade: { gravity: { y: 800 } } }, scene: { preload, create, update } };
 const game = new Phaser.Game(config);
 let player, enemies, specialEnemies, bonuses, fireballs = [];
 let isDead = false, lives = 3, hearts = [], isPaused = false, enemiesSpeed = -200, specialEnemiesSpeed = 180;
 let lastDirection = 'right', isCrouching = false, enemiesStopped = false, showMenu = false, menuText;
-let backgroundMusic = null, isMuted = false, currentVolume = 0.5, score = 0, scoreText, scoreFrame;
+let backgroundMusic = null, isMuted = false, currentVolume = 0.1, score = 0, scoreText, scoreFrame;
 let doubleJumpActive = false, canDoubleJump = false, doubleJumpTimer = null, fireShieldActive = false, fireShieldTimer = null;
 let fireShieldTimerGraphic = null, fireShieldIcon = null, fireShieldStartTime = 0;
 let invincibleTimer = null, isInvincible = false;
@@ -44,31 +51,98 @@ let dustParticles, footprints = [], footprintDelay = 0;
 let touchLeft = false, touchRight = false, jumpCooldown = false, touchCrouchActive = false;
 let isRespawning = false, enemiesGenerationEnabled = true;
 let fireShieldRotation = 0;
+let audioInitialized = false;
+let gameStarted = false;
+let titleScreen, startButton, titleBg;
 const BONUS_DURATION = 15000;
 
 function preload() {
-  this.load.image('bg', 'bg.png'); this.load.image('run1', 'run1.png'); this.load.image('run2', 'run2.png'); this.load.image('run3', 'run3.png'); this.load.image('run4', 'run4.png');
-  this.load.image('crouch', 'crouch.png'); this.load.image('enemy', 'enemy.png'); this.load.image('enemy2', 'enemy2.png'); this.load.image('enemy3', 'enemy3.png');
-  this.load.image('heart', 'heart.png'); this.load.image('sneaker', 'sneaker.png'); this.load.image('fireball', 'fireball.png'); this.load.audio('bgMusic', 'music.mp3');
+  this.load.image('bg', 'bg.png');
+  this.load.image('run1', 'run1.png');
+  this.load.image('run2', 'run2.png');
+  this.load.image('run3', 'run3.png');
+  this.load.image('run4', 'run4.png');
+  this.load.image('crouch', 'crouch.png');
+  this.load.image('enemy', 'enemy.png');
+  this.load.image('enemy2', 'enemy2.png');
+  this.load.image('enemy3', 'enemy3.png');
+  this.load.image('heart', 'heart.png');
+  this.load.image('sneaker', 'sneaker.png');
+  this.load.image('fireball', 'fireball.png');
+  this.load.image('title', 'title.png'); // Главный экран с персонажем и кнопкой Старт
+  this.load.audio('bgMusic', 'music.mp3');
 }
 
 function create() {
+  // Создаём титульный экран
+  titleBg = this.add.image(400, 200, 'title');
+  titleBg.setDisplaySize(800, 400);
+  titleBg.setDepth(3000);
+  
+  // Создаём кнопку старт в нижней центральной части экрана
+  startButton = this.add.rectangle(400, 350, 200, 60, 0xffaa44, 0.9);
+  startButton.setStrokeStyle(3, 0xffdd88);
+  startButton.setDepth(3001);
+  startButton.setInteractive({ useHandCursor: true });
+  
+  const startText = this.add.text(400, 350, 'СТАРТ', { fontSize: '28px', fill: '#ffffff', fontFamily: 'monospace', fontWeight: 'bold' });
+  startText.setOrigin(0.5);
+  startText.setDepth(3002);
+  
+  // Анимация пульсации кнопки
+  this.tweens.add({
+    targets: startButton,
+    scale: { from: 1, to: 1.05 },
+    duration: 800,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.easeInOut'
+  });
+  
+  // Обработчик клика/касания для старта игры
+  const startGame = () => {
+    if (gameStarted) return;
+    gameStarted = true;
+    
+    // Удаляем титульный экран
+    titleBg.destroy();
+    startButton.destroy();
+    startText.destroy();
+    
+    // Показываем элементы управления
+    document.getElementById('topPanel').style.display = 'flex';
+    document.getElementById('touchPanel').style.display = 'flex';
+    
+    // Запускаем инициализацию игры
+    initGame.call(this);
+  };
+  
+  startButton.on('pointerdown', startGame);
+  // Также обрабатываем тап по всему экрану как запасной вариант
+  this.input.on('pointerdown', (pointer) => {
+    if (!gameStarted && pointer.y > 300) {
+      startGame();
+    }
+  });
+}
+
+function initGame() {
   isDead = false; lives = 3; score = 0; isPaused = false; lastDirection = 'right'; isCrouching = false; enemiesStopped = false; showMenu = false;
   currentWeather = 'rain'; touchLeft = false; touchRight = false; touchCrouchActive = false; doubleJumpActive = false; canDoubleJump = false;
   isInvincible = false; isRespawning = false; enemiesGenerationEnabled = true; fireShieldActive = false; fireballs = []; fireShieldRotation = 0;
+  
   this.groundY = 320;
   this.bg = this.add.image(400, 200, 'bg'); this.bg.displayWidth = 800; this.bg.displayHeight = 400;
   this.ground = this.physics.add.staticGroup(); const groundBlock = this.ground.create(400, this.groundY + 40).setDisplaySize(800, 40).refreshBody(); groundBlock.visible = false;
   player = this.physics.add.sprite(200, this.groundY, 'run1'); player.setScale(0.25); player.setCollideWorldBounds(true); this.physics.add.collider(player, this.ground); player.body.setSize(55, 58, 1, 2);
   this.anims.create({ key: 'run', frames: [{ key: 'run1' }, { key: 'run2' }, { key: 'run3' }, { key: 'run4' }], frameRate: 10, repeat: -1 });
   this.anims.create({ key: 'enemyAnim', frames: [{ key: 'enemy' }, { key: 'enemy2' }, { key: 'enemy3' }, { key: 'enemy2' }], frameRate: 8, repeat: -1 });
-  this.cursors = this.input.keyboard.createCursorKeys();
-  this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu && !isRespawning) { isPaused = !isPaused; managePause.call(this); } });
-  this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu && !isRespawning) toggleEnemiesStop.call(this); });
-  this.input.keyboard.on('keydown-ESC', () => { if (!isDead && !isRespawning) toggleMenu.call(this); });
-  this.input.keyboard.on('keydown-W', () => { if (!isDead && !showMenu && !isRespawning) toggleWeather.call(this); });
-
-  enemies = this.physics.add.group({ allowGravity: false }); specialEnemies = this.physics.add.group({ allowGravity: false }); bonuses = this.physics.add.group({ allowGravity: true });
+  
+  enemies = this.physics.add.group({ allowGravity: false });
+  specialEnemies = this.physics.add.group({ allowGravity: false });
+  bonuses = this.physics.add.group({ allowGravity: true });
+  
+  // Столкновения
   this.physics.add.overlap(player, bonuses, (p, bonus) => {
     if (isDead || isPaused || showMenu || isRespawning) return;
     const bonusType = bonus.getData('type');
@@ -78,8 +152,33 @@ function create() {
     bonus.destroy();
   });
   this.physics.add.collider(bonuses, this.ground, (bonus) => { bonus.body.setVelocityY(0); bonus.body.setGravityY(0); });
-  this.physics.add.overlap(player, enemies, (p, enemy) => { if (isDead || isPaused || showMenu || isRespawning) return; if (isInvincible) return; if (!fireShieldActive) { let hit = (enemy.getData('type') === 'low') ? player.body.blocked.down : !isCrouching; if (hit) playerHit.call(this); } else { enemy.destroy(); } });
-  this.physics.add.overlap(player, specialEnemies, (p, monster) => { if (isDead || isPaused || showMenu || isRespawning) return; if (isInvincible) return; if (!fireShieldActive) { const isLow = monster.getData('type') === 'goldLow' || monster.getData('type') === 'silverLow'; let hit = isLow ? player.body.blocked.down : !isCrouching; if (hit) playerHit.call(this); } else { monster.destroy(); } });
+  
+  this.physics.add.overlap(player, enemies, (p, enemy) => {
+    if (isDead || isPaused || showMenu || isRespawning) return;
+    if (isInvincible) return;
+    if (!fireShieldActive) {
+      let hit = (enemy.getData('type') === 'low') ? player.body.blocked.down : !isCrouching;
+      if (hit) playerHit.call(this);
+      else createDustExplosion.call(this, enemy.x, enemy.y);
+    } else {
+      createDustExplosion.call(this, enemy.x, enemy.y);
+    }
+    enemy.destroy();
+  });
+  
+  this.physics.add.overlap(player, specialEnemies, (p, monster) => {
+    if (isDead || isPaused || showMenu || isRespawning) return;
+    if (isInvincible) return;
+    if (!fireShieldActive) {
+      const isLow = monster.getData('type') === 'goldLow' || monster.getData('type') === 'silverLow';
+      let hit = isLow ? player.body.blocked.down : !isCrouching;
+      if (hit) playerHit.call(this);
+      else createDustExplosion.call(this, monster.x, monster.y);
+    } else {
+      createDustExplosion.call(this, monster.x, monster.y);
+    }
+    monster.destroy();
+  });
 
   // Спавн бонусов
   this.time.addEvent({ delay: 8000, loop: true, callback: () => {
@@ -100,33 +199,87 @@ function create() {
   this.time.addEvent({ delay: 1400, loop: true, callback: () => { if (!enemiesGenerationEnabled || isDead || isPaused || showMenu || isRespawning) return; const low = Math.random() > 0.5; let y = low ? this.groundY + 48 : this.groundY - 15; let w = low ? 320 : 180, h = low ? 320 : 180, ox = low ? -35 : -45, oy = low ? -35 : -45; let enemy = enemies.create(850, y, 'enemy'); enemy.setVelocityX(enemiesStopped ? 0 : enemiesSpeed); enemy.setScale(0.2); enemy.body.setSize(w, h, ox, oy); enemy.play('enemyAnim'); enemy.setData('type', low ? 'low' : 'high'); enemy.setTint(low ? 0xff6666 : 0xaa66ff); enemy.setData('scored', false); }, callbackScope: this });
   this.time.addEvent({ delay: 2500, loop: true, callback: () => { if (!enemiesGenerationEnabled || isDead || isPaused || showMenu || isRespawning) return; const isGold = Math.random() > 0.5; const isLow = Math.random() > 0.5; let y = isLow ? this.groundY + 48 : this.groundY - 15; let w = isLow ? 320 : 180, h = isLow ? 320 : 180, ox = isLow ? -35 : -45, oy = isLow ? -35 : -45; let monster = specialEnemies.create(-50, y, 'enemy'); monster.setVelocityX(enemiesStopped ? 0 : specialEnemiesSpeed); monster.setScale(0.2); monster.body.setSize(w, h, ox, oy); monster.play('enemyAnim'); monster.setData('type', isGold ? (isLow ? 'goldLow' : 'goldHigh') : (isLow ? 'silverLow' : 'silverHigh')); monster.setTint(isGold ? 0xffd700 : 0xc0c0c0); monster.setFlipX(true); monster.setData('scored', false); }, callbackScope: this });
 
-  updateHeartsDisplay.call(this); updateScoreDisplay();
+  updateHeartsDisplay.call(this); 
+  updateScoreDisplay();
   scoreFrame = this.add.graphics(); scoreFrame.fillStyle(0x000000, 0.7); scoreFrame.fillRoundedRect(10, 65, 140, 32, 8); scoreFrame.lineStyle(2, 0xffaa44, 0.8); scoreFrame.strokeRoundedRect(10, 65, 140, 32, 8); scoreFrame.setDepth(999);
   scoreText = this.add.text(80, 78, 'Уклонений: 0', { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace', fontWeight: 'bold' }); scoreText.setOrigin(0.5, 0.5); scoreText.setDepth(1000);
   menuText = this.add.text(400, 200, '', { fontSize: '20px', fill: '#fff', backgroundColor: '#000', padding: { x: 20, y: 20 }, align: 'center' }); menuText.setOrigin(0.5).setDepth(2000).setVisible(false);
   lightningFlash = this.add.rectangle(400, 200, 800, 400, 0xffffff, 0).setDepth(1500).setVisible(false);
-  startRainVisuals.call(this); createDustParticles.call(this); initAudio.call(this); setupMobileControls.call(this);
+  startRainVisuals.call(this); 
+  createDustParticles.call(this);
+  setupMobileControls.call(this);
+  
+  initAudio.call(this);
+  
+  // Клавиатура
+  this.cursors = this.input.keyboard.createCursorKeys();
+  this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu && !isRespawning && gameStarted) { isPaused = !isPaused; managePause.call(this); } });
+  this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu && !isRespawning && gameStarted) toggleEnemiesStop.call(this); });
+  this.input.keyboard.on('keydown-ESC', () => { if (!isDead && !isRespawning && gameStarted) toggleMenu.call(this); });
+  this.input.keyboard.on('keydown-W', () => { if (!isDead && !showMenu && !isRespawning && gameStarted) toggleWeather.call(this); });
+  
+  const startAudioOnTouch = () => {
+    if (!audioInitialized && backgroundMusic) {
+      backgroundMusic.play().catch(()=>{});
+      audioInitialized = true;
+    }
+  };
+  document.addEventListener('touchstart', startAudioOnTouch);
+  document.addEventListener('click', startAudioOnTouch);
 }
 
-// КРУГОВОЙ ТАЙМЕР ДЛЯ ОГНЕННЫХ ШАРОВ
+function createDustExplosion(x, y) {
+  for (let i = 0; i < 25; i++) {
+    let angle = Math.random() * Math.PI * 2;
+    let speed = 50 + Math.random() * 150;
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed - 80;
+    let size = 3 + Math.random() * 5;
+    let particle = this.add.ellipse(x, y, size, size, 0x8B7355, 0.8);
+    particle.setDepth(580);
+    this.tweens.add({
+      targets: particle,
+      x: particle.x + vx * 0.3,
+      y: particle.y + vy * 0.3,
+      alpha: 0,
+      scale: { from: 1, to: 0.2 },
+      duration: 500 + Math.random() * 300,
+      ease: 'Power2',
+      onComplete: () => particle.destroy()
+    });
+  }
+  for (let i = 0; i < 10; i++) {
+    let angle = Math.random() * Math.PI * 2;
+    let speed = 80 + Math.random() * 180;
+    let vx = Math.cos(angle) * speed;
+    let vy = Math.sin(angle) * speed - 60;
+    let spark = this.add.text(x, y, '·', { fontSize: '10px', fill: '#aa8866' });
+    spark.setDepth(581);
+    this.tweens.add({
+      targets: spark,
+      x: spark.x + vx * 0.3,
+      y: spark.y + vy * 0.3,
+      alpha: 0,
+      scale: { from: 1, to: 0 },
+      duration: 400,
+      onComplete: () => spark.destroy()
+    });
+  }
+}
+
 function createFireShieldTimer() {
   if (fireShieldTimerGraphic) fireShieldTimerGraphic.destroy();
   if (fireShieldIcon) fireShieldIcon.destroy();
-  const radius = 18;
-  const x = player.x;
-  const y = player.y - 65;
+  const radius = 18, x = player.x, y = player.y - 65;
   fireShieldTimerGraphic = this.add.graphics();
   fireShieldTimerGraphic.setDepth(550);
-  fireShieldTimerGraphic.x = x;
-  fireShieldTimerGraphic.y = y;
+  fireShieldTimerGraphic.x = x; fireShieldTimerGraphic.y = y;
   fireShieldTimerGraphic.fillStyle(0x000000, 0.7);
   fireShieldTimerGraphic.fillCircle(0, 0, radius + 3);
   fireShieldTimerGraphic.lineStyle(2, 0xff6600, 0.8);
   fireShieldTimerGraphic.strokeCircle(0, 0, radius);
   fireShieldIcon = this.add.image(x, y, 'fireball');
-  fireShieldIcon.setScale(0.12);
-  fireShieldIcon.setDepth(551);
-  fireShieldIcon.setTint(0xff8800);
+  fireShieldIcon.setScale(0.12); fireShieldIcon.setDepth(551); fireShieldIcon.setTint(0xff8800);
 }
 
 function updateFireShieldTimer() {
@@ -135,10 +288,7 @@ function updateFireShieldTimer() {
     if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; }
     return;
   }
-  if (!fireShieldTimerGraphic) {
-    createFireShieldTimer.call(this);
-    return;
-  }
+  if (!fireShieldTimerGraphic) { createFireShieldTimer.call(this); return; }
   const elapsed = Date.now() - fireShieldStartTime;
   const remaining = Math.max(0, BONUS_DURATION - elapsed);
   const percent = remaining / BONUS_DURATION;
@@ -147,12 +297,9 @@ function updateFireShieldTimer() {
     if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; }
     return;
   }
-  const radius = 18;
-  const x = player.x;
-  const y = player.y - 65;
+  const radius = 18, x = player.x, y = player.y - 65;
   if (fireShieldTimerGraphic) {
-    fireShieldTimerGraphic.x = x;
-    fireShieldTimerGraphic.y = y;
+    fireShieldTimerGraphic.x = x; fireShieldTimerGraphic.y = y;
     fireShieldTimerGraphic.clear();
     fireShieldTimerGraphic.fillStyle(0x000000, 0.7);
     fireShieldTimerGraphic.fillCircle(0, 0, radius + 3);
@@ -164,10 +311,7 @@ function updateFireShieldTimer() {
     fireShieldTimerGraphic.arc(0, 0, radius - 2, 0, (angle * Math.PI) / 180, false);
     fireShieldTimerGraphic.strokePath();
   }
-  if (fireShieldIcon) {
-    fireShieldIcon.x = x;
-    fireShieldIcon.y = y;
-  }
+  if (fireShieldIcon) { fireShieldIcon.x = x; fireShieldIcon.y = y; }
 }
 
 function createFireShield() {
@@ -175,9 +319,7 @@ function createFireShield() {
   fireballs = [];
   for (let i = 0; i < 6; i++) {
     let fb = this.add.image(player.x, player.y, 'fireball');
-    fb.setScale(0.1);
-    fb.setDepth(550);
-    fb.setTint(0xff6600);
+    fb.setScale(0.1); fb.setDepth(550); fb.setTint(0xff6600);
     fireballs.push(fb);
   }
 }
@@ -188,9 +330,7 @@ function updateFireShield() {
     return;
   }
   fireShieldRotation += 0.2;
-  let radius = 50;
-  // Смещение вниз на 25 пикселей (примерно 1.5 размера шара, так как шар 0.1 от 64px ≈ 6.4px, 1.5 размера ≈ 10px, но для наглядности смещаем на 25)
-  let verticalOffset = 25;
+  let radius = 50, verticalOffset = 25;
   for (let i = 0; i < fireballs.length; i++) {
     if (fireballs[i]) {
       let angle = fireShieldRotation + (i * Math.PI * 2 / fireballs.length);
@@ -258,22 +398,52 @@ function playerHit() { if (isDead || isPaused || showMenu || isRespawning) retur
 }
 function createDustParticles() { dustParticles = this.add.particles(0, 0, null, { speed: { min: 20, max: 50 }, angle: { min: 150, max: 210 }, scale: { start: 0.3, end: 0 }, alpha: { start: 0.6, end: 0 }, lifespan: 400, quantity: 2, tint: 0x8B7355 }); let g = this.add.graphics(); g.fillStyle(0x8B7355, 1); g.fillCircle(4, 4, 4); g.generateTexture('dust', 8, 8); g.clear(); dustParticles.setTexture('dust').setDepth(800); }
 function addFootprint(x, y) { if (footprints.length > 30) footprints.shift().destroy(); let fp = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5).setDepth(600); this.tweens.add({ targets: fp, alpha: 0, duration: 5000, onComplete: () => fp.destroy() }); footprints.push(fp); }
-function initAudio() { try { if (backgroundMusic && backgroundMusic.isPlaying) return; if (backgroundMusic && !backgroundMusic.isPlaying) { if (!isMuted) backgroundMusic.resume(); return; } backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume }); backgroundMusic.play(); let slider = document.getElementById('volumeSlider'), val = document.getElementById('volumeValue'), icon = document.getElementById('audioIcon'); if (slider && !slider.hasListener) { slider.value = currentVolume * 100; val.textContent = Math.round(currentVolume * 100) + '%'; slider.hasListener = true; slider.addEventListener('input', (e) => { currentVolume = e.target.value / 100; val.textContent = e.target.value + '%'; if (backgroundMusic) backgroundMusic.setVolume(currentVolume); if (currentVolume === 0) { isMuted = true; icon.textContent = '🔇'; } else { isMuted = false; icon.textContent = '🔊'; } }); } } catch(e) { console.log("audio err", e); } }
+function initAudio() { 
+  try {
+    if (backgroundMusic && backgroundMusic.isPlaying) return;
+    if (backgroundMusic) { if (!isMuted) backgroundMusic.resume(); return; }
+    backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
+    backgroundMusic.setVolume(0.1);
+    backgroundMusic.play().catch(e => console.log("Авто-запуск заблокирован"));
+    setupAudioControls();
+  } catch(e) { console.log("audio err", e); }
+}
+function setupAudioControls() { 
+  const slider = document.getElementById('volumeSlider'), val = document.getElementById('volumeValue'), icon = document.getElementById('audioIcon'); 
+  if (slider && !slider.hasListener) { 
+    slider.value = currentVolume * 100; 
+    val.textContent = Math.round(currentVolume * 100) + '%'; 
+    slider.hasListener = true; 
+    slider.addEventListener('input', (e) => { 
+      currentVolume = e.target.value / 100; 
+      val.textContent = e.target.value + '%'; 
+      if (backgroundMusic) backgroundMusic.setVolume(currentVolume); 
+      if (currentVolume === 0) { isMuted = true; icon.textContent = '🔇'; } 
+      else { isMuted = false; icon.textContent = '🔊'; } 
+      if (!audioInitialized && backgroundMusic) {
+        backgroundMusic.play().catch(()=>{});
+        audioInitialized = true;
+      }
+    }); 
+  } 
+}
 function setupMobileControls() { 
   let btnL = document.getElementById('btnLeft'), btnR = document.getElementById('btnRight'), btnJ = document.getElementById('btnJump'), btnC = document.getElementById('btnCrouch'), btnP = document.getElementById('btnPause'), btnS = document.getElementById('btnStopEnemies'), btnW = document.getElementById('btnWeather'), btnM = document.getElementById('btnMenu');
-  let setLeft = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning) touchLeft = s; }; let setRight = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning) touchRight = s; };
+  let setLeft = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning && gameStarted) touchLeft = s; };
+  let setRight = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning && gameStarted) touchRight = s; };
   btnL.addEventListener('touchstart', e => { e.preventDefault(); setLeft(true); }); btnL.addEventListener('touchend', e => { e.preventDefault(); setLeft(false); }); btnL.addEventListener('mousedown', () => setLeft(true)); btnL.addEventListener('mouseup', () => setLeft(false)); btnL.addEventListener('mouseleave', () => setLeft(false));
   btnR.addEventListener('touchstart', e => { e.preventDefault(); setRight(true); }); btnR.addEventListener('touchend', e => { e.preventDefault(); setRight(false); }); btnR.addEventListener('mousedown', () => setRight(true)); btnR.addEventListener('mouseup', () => setRight(false)); btnR.addEventListener('mouseleave', () => setRight(false));
-  let doJump = () => { if (isDead || isPaused || showMenu || isRespawning) return; if (player.body.blocked.down && !jumpCooldown && !isCrouching) { player.setVelocityY(-260); jumpCooldown = true; canDoubleJump = true; this.time.delayedCall(200, () => { jumpCooldown = false; }); } else if (doubleJumpActive && canDoubleJump && !player.body.blocked.down && !jumpCooldown && !isCrouching) { player.setVelocityY(-260); jumpCooldown = true; canDoubleJump = false; this.time.delayedCall(200, () => { jumpCooldown = false; }); for (let i = 0; i < 8; i++) { let trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7); this.tweens.add({ targets: trail, y: trail.y - 30, alpha: 0, scale: { from: 1, to: 0 }, duration: 400, onComplete: () => trail.destroy() }); } } };
+  let doJump = () => { if (isDead || isPaused || showMenu || isRespawning || !gameStarted) return; if (player.body.blocked.down && !jumpCooldown && !isCrouching) { player.setVelocityY(-260); jumpCooldown = true; canDoubleJump = true; this.time.delayedCall(200, () => { jumpCooldown = false; }); } else if (doubleJumpActive && canDoubleJump && !player.body.blocked.down && !jumpCooldown && !isCrouching) { player.setVelocityY(-260); jumpCooldown = true; canDoubleJump = false; this.time.delayedCall(200, () => { jumpCooldown = false; }); for (let i = 0; i < 8; i++) { let trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7); this.tweens.add({ targets: trail, y: trail.y - 30, alpha: 0, scale: { from: 1, to: 0 }, duration: 400, onComplete: () => trail.destroy() }); } } };
   btnJ.addEventListener('click', e => { e.preventDefault(); doJump(); }); btnJ.addEventListener('touchstart', e => { e.preventDefault(); doJump(); });
   btnC.addEventListener('touchstart', e => { e.preventDefault(); touchCrouchActive = true; }); btnC.addEventListener('touchend', e => { e.preventDefault(); touchCrouchActive = false; }); btnC.addEventListener('mousedown', () => { touchCrouchActive = true; }); btnC.addEventListener('mouseup', () => { touchCrouchActive = false; }); btnC.addEventListener('mouseleave', () => { touchCrouchActive = false; });
-  btnP.addEventListener('click', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning) { isPaused = !isPaused; managePause.call(this); } }); btnP.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning) { isPaused = !isPaused; managePause.call(this); } });
-  btnS.addEventListener('click', e => { e.preventDefault(); if (!isDead && !isPaused && !showMenu && !isRespawning) toggleEnemiesStop.call(this); }); btnS.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !isPaused && !showMenu && !isRespawning) toggleEnemiesStop.call(this); });
-  btnW.addEventListener('click', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning) toggleWeather.call(this); }); btnW.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning) toggleWeather.call(this); });
-  btnM.addEventListener('click', e => { e.preventDefault(); if (!isDead && !isRespawning) toggleMenu.call(this); }); btnM.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !isRespawning) toggleMenu.call(this); });
+  btnP.addEventListener('click', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning && gameStarted) { isPaused = !isPaused; managePause.call(this); } }); btnP.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning && gameStarted) { isPaused = !isPaused; managePause.call(this); } });
+  btnS.addEventListener('click', e => { e.preventDefault(); if (!isDead && !isPaused && !showMenu && !isRespawning && gameStarted) toggleEnemiesStop.call(this); }); btnS.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !isPaused && !showMenu && !isRespawning && gameStarted) toggleEnemiesStop.call(this); });
+  btnW.addEventListener('click', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning && gameStarted) toggleWeather.call(this); }); btnW.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !showMenu && !isRespawning && gameStarted) toggleWeather.call(this); });
+  btnM.addEventListener('click', e => { e.preventDefault(); if (!isDead && !isRespawning && gameStarted) toggleMenu.call(this); }); btnM.addEventListener('touchstart', e => { e.preventDefault(); if (!isDead && !isRespawning && gameStarted) toggleMenu.call(this); });
 }
 function update() {
-  if (showMenu) { menuText.setVisible(true); menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко (СБРАСЫВАЕТСЯ ПРИ СМЕРТИ)\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n🔥 6 огненных шаров - убивают врагов 15 сек!\n💊 Сердечко - восстанавливает 1 жизнь\n💥 СМЕРТЬ: ВЗРЫВ 1000 ЗВЁЗД + ТЕЛЕПОРТ\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ'); return; } else menuText.setVisible(false);
+  if (!gameStarted) return;
+  if (showMenu) { menuText.setVisible(true); menuText.setText('========== ЦУКИХИМЭ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко (СБРАСЫВАЕТСЯ ПРИ СМЕРТИ)\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n🔥 6 огненных шаров - убивают врагов 15 сек!\n💊 Сердечко - восстанавливает 1 жизнь\n💥 СМЕРТЬ: ВЗРЫВ 1000 ЗВЁЗД + ТЕЛЕПОРТ\n💨 ВРАГИ РАССЫПАЮТСЯ В ПЫЛЬ!\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ'); return; } else menuText.setVisible(false);
   if (isDead || isPaused || isRespawning) return;
   if (currentWeather === 'rain') { for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } } for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } } }
   updateBonusTimer.call(this);
