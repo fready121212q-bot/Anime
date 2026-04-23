@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Финальная версия</title>
+  <title>Runner Game — Вибрация при уроне</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -17,7 +17,6 @@
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
 
-    /* Верхняя панель с кнопками и регулятором громкости */
     .top-panel {
       position: fixed;
       top: 12px;
@@ -57,7 +56,6 @@
       background: rgba(100, 150, 220, 0.9);
     }
 
-    /* Регулятор громкости под кнопками */
     .volume-control {
       background: rgba(0,0,0,0.7);
       backdrop-filter: blur(8px);
@@ -95,7 +93,6 @@
       text-align: center;
     }
 
-    /* Нижние кнопки: движение и прыжок/присед с отступами */
     .touch-panel {
       position: fixed;
       bottom: 25px;
@@ -108,8 +105,6 @@
       z-index: 1800;
       pointer-events: none;
     }
-
-    /* Левая группа (движение) */
     .move-group {
       display: flex;
       gap: 40px;
@@ -119,8 +114,6 @@
       backdrop-filter: blur(4px);
       pointer-events: auto;
     }
-
-    /* Правая группа (прыжок и присед) — отступ 3 см (примерно 80px на мобильном) */
     .action-group {
       display: flex;
       gap: 40px;
@@ -131,7 +124,6 @@
       pointer-events: auto;
       margin-left: 80px;
     }
-
     .touch-panel button {
       background: rgba(20, 25, 45, 0.9);
       backdrop-filter: blur(12px);
@@ -158,23 +150,8 @@
       border-color: #ffcc88;
     }
 
-    .btn-label {
-      font-size: 10px;
-      position: absolute;
-      bottom: -20px;
-      color: #ddd;
-      background: rgba(0,0,0,0.6);
-      padding: 2px 6px;
-      border-radius: 20px;
-      white-space: nowrap;
-    }
-    .touch-panel button {
-      position: relative;
-    }
-
     @media (max-width: 700px) {
       .touch-panel button { width: 65px; height: 65px; font-size: 28px; }
-      .btn-label { font-size: 9px; bottom: -18px; }
       .move-group { gap: 30px; padding: 10px 20px; }
       .action-group { gap: 30px; padding: 10px 20px; margin-left: 50px; }
       .top-buttons button { font-size: 14px; padding: 6px 12px; min-width: 55px; }
@@ -191,15 +168,13 @@
   </style>
 </head>
 <body>
-<!-- Верхняя панель с кнопками -->
 <div class="top-panel">
   <div class="top-buttons">
-    <button id="btnPause" data-action="pause">⏸️ ПАУЗА</button>
-    <button id="btnStopEnemies" data-action="stopEnemies">⏹️ СТОП</button>
-    <button id="btnWeather" data-action="weather">🌦️ ПОГОДА</button>
-    <button id="btnMenu" data-action="menu">📜 МЕНЮ</button>
+    <button id="btnPause">⏸️ ПАУЗА</button>
+    <button id="btnStopEnemies">⏹️ СТОП</button>
+    <button id="btnWeather">🌦️ ПОГОДА</button>
+    <button id="btnMenu">📜 МЕНЮ</button>
   </div>
-  <!-- Регулятор громкости под кнопками -->
   <div class="volume-control">
     <div class="volume-icon" id="audioIcon">🔊</div>
     <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
@@ -207,15 +182,14 @@
   </div>
 </div>
 
-<!-- Нижние панели с кнопками: движение слева, прыжок/присед справа с отступом -->
 <div class="touch-panel">
   <div class="move-group">
-    <button id="btnLeft" data-action="left">◀</button>
-    <button id="btnRight" data-action="right">▶</button>
+    <button id="btnLeft">◀</button>
+    <button id="btnRight">▶</button>
   </div>
   <div class="action-group">
-    <button id="btnJump" data-action="jump">▲</button>
-    <button id="btnCrouch" data-action="crouch">▼<span class="btn-label">присед</span></button>
+    <button id="btnJump">▲</button>
+    <button id="btnCrouch">▼</button>
   </div>
 </div>
 
@@ -254,6 +228,7 @@ const BONUS_DURATION = 15000;
 
 let invincibleTimer = null;
 let isInvincible = false;
+let shakeTween = null;
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -374,7 +349,6 @@ function create() {
     bonus.body.setGravityY(0);
   });
 
-  // Столкновение с врагами
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     if (isInvincible) return;
@@ -430,7 +404,6 @@ function create() {
     callbackScope: this
   });
 
-  // Генерация врагов
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -514,6 +487,71 @@ function create() {
   createDustParticles.call(this);
   initAudio.call(this);
   setupMobileControls.call(this);
+}
+
+// Функция вибрации (только для мобильных устройств)
+function vibrate() {
+  if (window.navigator && window.navigator.vibrate) {
+    window.navigator.vibrate(100);
+  }
+}
+
+// Эффект звёздочек
+function createStarEffect() {
+  for (let i = 0; i < 16; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 100 + Math.random() * 150;
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed - 50;
+    
+    const star = this.add.text(player.x, player.y, '✦', { fontSize: '12px', fill: '#ffaa44' });
+    star.setDepth(600);
+    
+    this.tweens.add({
+      targets: star,
+      x: star.x + vx * 0.3,
+      y: star.y + vy * 0.3,
+      alpha: 0,
+      scale: { from: 1, to: 0.3 },
+      duration: 500,
+      ease: 'Power2',
+      onComplete: () => star.destroy()
+    });
+  }
+}
+
+// Эффект тряски персонажа
+function shakePlayer() {
+  if (shakeTween) shakeTween.stop();
+  
+  const originalX = player.x;
+  const originalY = player.y;
+  
+  let shakeCount = 0;
+  const shakeInterval = this.time.addEvent({
+    delay: 35,
+    repeat: 7,
+    callback: () => {
+      const offsetX = (Math.random() - 0.5) * 8;
+      const offsetY = (Math.random() - 0.5) * 5;
+      player.x = originalX + offsetX;
+      player.y = originalY + offsetY;
+      shakeCount++;
+      if (shakeCount >= 8) {
+        player.x = originalX;
+        player.y = originalY;
+        shakeInterval.remove();
+      }
+    },
+    callbackScope: this
+  });
+}
+
+// Эффект звёздочки + тряска персонажа + вибрация
+function damageEffect() {
+  createStarEffect.call(this);
+  shakePlayer.call(this);
+  vibrate(); // Вибрация на мобильных устройствах
 }
 
 function createBonusTimer() {
@@ -751,6 +789,9 @@ function playerHit() {
   lives--;
   updateHeartsDisplay.call(this);
   
+  // Запускаем эффект звёздочки + тряска + вибрация
+  damageEffect.call(this);
+  
   isInvincible = true;
   player.setTint(0xff8888);
   
@@ -890,7 +931,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n📱 Вибрация при получении урона\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
     return;
   } else menuText.setVisible(false);
 
