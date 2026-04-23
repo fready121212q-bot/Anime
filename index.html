@@ -53,7 +53,8 @@ let isRespawning = false, enemiesGenerationEnabled = true;
 let fireShieldRotation = 0;
 let audioInitialized = false;
 let gameStarted = false;
-let titleScreen, startButton, titleBg;
+let titleScreen;
+let clickArea; // невидимая область для клика по кнопке на картинке
 const BONUS_DURATION = 15000;
 
 function preload() {
@@ -69,30 +70,26 @@ function preload() {
   this.load.image('heart', 'heart.png');
   this.load.image('sneaker', 'sneaker.png');
   this.load.image('fireball', 'fireball.png');
-  this.load.image('title', 'title.png'); // Главный экран с персонажем и кнопкой Старт
+  this.load.image('title', 'title.png');
   this.load.audio('bgMusic', 'music.mp3');
 }
 
 function create() {
-  // Создаём титульный экран
-  titleBg = this.add.image(400, 200, 'title');
-  titleBg.setDisplaySize(800, 400);
-  titleBg.setDepth(3000);
+  // Создаём титульный экран (картинка уже содержит кнопку СТАРТ)
+  titleScreen = this.add.image(400, 200, 'title');
+  titleScreen.setDisplaySize(800, 400);
+  titleScreen.setDepth(3000);
   
-  // Создаём кнопку старт в нижней центральной части экрана
-  startButton = this.add.rectangle(400, 350, 200, 60, 0xffaa44, 0.9);
-  startButton.setStrokeStyle(3, 0xffdd88);
-  startButton.setDepth(3001);
-  startButton.setInteractive({ useHandCursor: true });
+  // Создаём невидимую область для клика (в районе кнопки на картинке)
+  // Нижняя центральная часть экрана (y от 320 до 380, x от 250 до 550)
+  clickArea = this.add.rectangle(400, 350, 300, 60, 0x000000, 0);
+  clickArea.setDepth(3001);
+  clickArea.setInteractive({ useHandCursor: true });
   
-  const startText = this.add.text(400, 350, 'СТАРТ', { fontSize: '28px', fill: '#ffffff', fontFamily: 'monospace', fontWeight: 'bold' });
-  startText.setOrigin(0.5);
-  startText.setDepth(3002);
-  
-  // Анимация пульсации кнопки
+  // Эффект пульсации курсора (визуальный намёк что можно нажать)
   this.tweens.add({
-    targets: startButton,
-    scale: { from: 1, to: 1.05 },
+    targets: clickArea,
+    scale: { from: 1, to: 1.02 },
     duration: 800,
     yoyo: true,
     repeat: -1,
@@ -104,10 +101,9 @@ function create() {
     if (gameStarted) return;
     gameStarted = true;
     
-    // Удаляем титульный экран
-    titleBg.destroy();
-    startButton.destroy();
-    startText.destroy();
+    // Удаляем титульный экран и область клика
+    titleScreen.destroy();
+    clickArea.destroy();
     
     // Показываем элементы управления
     document.getElementById('topPanel').style.display = 'flex';
@@ -117,10 +113,10 @@ function create() {
     initGame.call(this);
   };
   
-  startButton.on('pointerdown', startGame);
-  // Также обрабатываем тап по всему экрану как запасной вариант
+  clickArea.on('pointerdown', startGame);
+  // Также обрабатываем тап по всему экрану как запасной вариант (любое касание)
   this.input.on('pointerdown', (pointer) => {
-    if (!gameStarted && pointer.y > 300) {
+    if (!gameStarted) {
       startGame();
     }
   });
