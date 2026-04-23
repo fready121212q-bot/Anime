@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (CROUCH FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (SLIDING FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -36,7 +36,6 @@
     .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer; }
     .volume-value { color: white; font-size: 11px; min-width: 32px; }
 
-    /* МОБИЛЬНЫЕ КНОПКИ */
     .touch-panel {
       position: fixed;
       bottom: 20px;
@@ -129,7 +128,6 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- СЕНСОРНЫЕ КНОПКИ -->
 <div class="touch-panel">
   <div class="left-group">
     <button id="btnLeft" data-action="left">◀</button>
@@ -148,7 +146,6 @@
 </div>
 
 <script>
-// ---------- Глобальные переменные ----------
 let player;
 let enemies;
 let isDead = false;
@@ -176,11 +173,10 @@ let dustParticles;
 let footprints = [];
 let footprintDelay = 0;
 
-// Сенсорные флаги
 let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
-let touchCrouchActive = false;  // Флаг для сенсорной кнопки приседания
+let touchCrouchActive = false;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -259,7 +255,6 @@ function create() {
 
   this.cursors = this.input.keyboard.createCursorKeys();
 
-  // Клавиатура
   this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu) { isPaused = !isPaused; managePause.call(this); } });
   this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu) toggleEnemiesStop.call(this); });
   this.input.keyboard.on('keydown-ESC', () => { if (!isDead) toggleMenu.call(this); });
@@ -267,7 +262,6 @@ function create() {
 
   enemies = this.physics.add.group({ allowGravity: false });
 
-  // Столкновение с врагами
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     const enemyType = enemy.getData('type');
@@ -280,7 +274,6 @@ function create() {
     }
   });
 
-  // Генерация врагов
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -322,7 +315,6 @@ function create() {
   setupMobileControls.call(this);
 }
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
 function managePause() {
   if (isPaused) {
     this.physics.world.pause();
@@ -480,7 +472,6 @@ function setupAudioControls() {
   }
 }
 
-// ========== МОБИЛЬНЫЕ КНОПКИ ==========
 function setupMobileControls() {
   const btnLeft = document.getElementById('btnLeft');
   const btnRight = document.getElementById('btnRight');
@@ -491,7 +482,6 @@ function setupMobileControls() {
   const btnWeather = document.getElementById('btnWeather');
   const btnMenu = document.getElementById('btnMenu');
 
-  // Движение
   const setTouchLeft = (state) => { if (!isDead && !showMenu && !isPaused) touchLeft = state; };
   const setTouchRight = (state) => { if (!isDead && !showMenu && !isPaused) touchRight = state; };
   
@@ -507,7 +497,6 @@ function setupMobileControls() {
   btnRight.addEventListener('mouseup', () => setTouchRight(false));
   btnRight.addEventListener('mouseleave', () => setTouchRight(false));
 
-  // Прыжок
   const doJump = () => {
     if (isDead || isPaused || showMenu) return;
     if (player && player.body && player.body.blocked.down && !jumpCooldown && !isCrouching) {
@@ -519,71 +508,61 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // ПРИСЕДАНИЕ - прямая установка флага и применение
-  btnCrouch.addEventListener('touchstart', (e) => { 
-    e.preventDefault(); 
-    touchCrouchActive = true;
-    // Мгновенно применяем приседание, если игрок на земле
-    if (player && player.body && player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
+  // ПРИСЕДАНИЕ - исправлено, теперь НЕ ДВИГАЕТСЯ в стороны
+  const applyCrouch = () => {
+    if (!player || !player.body) return;
+    if (player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
       isCrouching = true;
       player.body.setSize(55, 35, 1, 23);
       player.setTexture('crouch');
       player.stop();
+      // ВАЖНО: обнуляем скорость по X, чтобы не скользить
+      player.setVelocityX(0);
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
     }
+  };
+  
+  const releaseCrouch = () => {
+    if (isCrouching) {
+      isCrouching = false;
+      player.body.setSize(55, 58, 1, 2);
+      player.setTexture('run1');
+      // Не обнуляем скорость здесь, чтобы можно было продолжить движение
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
+    }
+  };
+  
+  btnCrouch.addEventListener('touchstart', (e) => { 
+    e.preventDefault(); 
+    touchCrouchActive = true;
+    applyCrouch();
   });
   
   btnCrouch.addEventListener('touchend', (e) => { 
     e.preventDefault(); 
     touchCrouchActive = false;
-    // Отпускаем приседание
-    if (isCrouching) {
-      isCrouching = false;
-      player.body.setSize(55, 58, 1, 2);
-      player.setTexture('run1');
-      if (lastDirection === 'left') player.setFlipX(true);
-      else player.setFlipX(false);
-    }
+    releaseCrouch();
   });
   
   btnCrouch.addEventListener('mousedown', () => { 
     touchCrouchActive = true;
-    if (player && player.body && player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
-      isCrouching = true;
-      player.body.setSize(55, 35, 1, 23);
-      player.setTexture('crouch');
-      player.stop();
-      if (lastDirection === 'left') player.setFlipX(true);
-      else player.setFlipX(false);
-    }
+    applyCrouch();
   });
   
   btnCrouch.addEventListener('mouseup', () => { 
     touchCrouchActive = false;
-    if (isCrouching) {
-      isCrouching = false;
-      player.body.setSize(55, 58, 1, 2);
-      player.setTexture('run1');
-      if (lastDirection === 'left') player.setFlipX(true);
-      else player.setFlipX(false);
-    }
+    releaseCrouch();
   });
   
   btnCrouch.addEventListener('mouseleave', () => { 
     if (touchCrouchActive) {
       touchCrouchActive = false;
-      if (isCrouching) {
-        isCrouching = false;
-        player.body.setSize(55, 58, 1, 2);
-        player.setTexture('run1');
-        if (lastDirection === 'left') player.setFlipX(true);
-        else player.setFlipX(false);
-      }
+      releaseCrouch();
     }
   });
 
-  // Пауза
   btnPause.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || showMenu) return;
@@ -592,7 +571,6 @@ function setupMobileControls() {
   });
   btnPause.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || showMenu) return; isPaused = !isPaused; managePause.call(this); });
   
-  // Стоп врагов
   btnStopEnemies.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
@@ -600,7 +578,6 @@ function setupMobileControls() {
   });
   btnStopEnemies.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleEnemiesStop.call(this); });
   
-  // Погода
   btnWeather.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
@@ -608,7 +585,6 @@ function setupMobileControls() {
   });
   btnWeather.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleWeather.call(this); });
   
-  // Меню
   btnMenu.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead) return;
@@ -617,7 +593,6 @@ function setupMobileControls() {
   btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
-// ========== ОСНОВНОЙ ЦИКЛ UPDATE ==========
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
@@ -627,7 +602,6 @@ function update() {
 
   if (isDead || isPaused) return;
 
-  // Погода: дождь
   if (currentWeather === 'rain') {
     for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
@@ -635,7 +609,7 @@ function update() {
 
   const isOnGround = player.body.blocked.down;
   
-  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (стрелка вниз)
+  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ
   const downKeyPressed = this.cursors.down.isDown;
   
   if (downKeyPressed && isOnGround && !isCrouching && !touchCrouchActive) {
@@ -643,11 +617,12 @@ function update() {
     player.body.setSize(55, 35, 1, 23);
     player.setTexture('crouch');
     player.stop();
+    // Обнуляем скорость чтобы не скользить
+    player.setVelocityX(0);
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
   } 
   else if (!downKeyPressed && isCrouching && !touchCrouchActive) {
-    // Отпускаем приседание только если сенсорная кнопка не активна
     isCrouching = false;
     player.body.setSize(55, 58, 1, 2);
     player.setTexture('run1');
@@ -655,13 +630,15 @@ function update() {
     else player.setFlipX(false);
   }
   
-  // Если в приседе - выходим (нельзя двигаться)
+  // Если в приседе - полностью блокируем движение и НЕ применяем velocityX
   if (isCrouching) {
+    // Гарантированно обнуляем скорость по X, чтобы не было скольжения
+    player.setVelocityX(0);
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
   }
 
-  // Движение
+  // Движение (только если не в приседе)
   let moving = false;
   player.setVelocityX(0);
   
@@ -681,13 +658,11 @@ function update() {
     player.setFlipX(false);
   }
   
-  // Прыжок с клавиатуры
   if (this.cursors.up.isDown && isOnGround && !isCrouching) {
     player.setVelocityY(-260);
     moving = true;
   }
 
-  // Анимация и эффекты
   if (moving && isOnGround && !isCrouching) {
     if (dustParticles) {
       dustParticles.emitParticleAt(player.x - 15, player.y + 20);
