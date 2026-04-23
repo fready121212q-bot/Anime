@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Бонус: Кроссовк (двойной прыжок)</title>
+  <title>Runner Game — Бонус: Кроссовк (уменьшен)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -149,7 +149,7 @@
 let player;
 let enemies;
 let specialEnemies;
-let bonuses; // группа для бонусов
+let bonuses;
 let isDead = false;
 let deathTimer;
 let lives = 3;
@@ -169,12 +169,10 @@ let score = 0;
 let scoreText;
 let scoreFrame;
 
-// Бонусные переменные
 let doubleJumpActive = false;
 let doubleJumpTimer = null;
-let playerGlow = null; // свечение по контуру
+let playerGlow = null;
 let bonusSpawnTimer = null;
-let bonusActive = false;
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -221,7 +219,7 @@ function preload() {
   this.load.image('enemy2', 'enemy2.png');
   this.load.image('enemy3', 'enemy3.png');
   this.load.image('heart', 'heart.png');
-  this.load.image('sneaker', 'sneaker.png'); // картинка кроссовка
+  this.load.image('sneaker', 'sneaker.png');
   this.load.audio('bgMusic', 'music.mp3');
 }
 
@@ -239,7 +237,6 @@ function create() {
   touchRight = false;
   touchCrouchActive = false;
   doubleJumpActive = false;
-  bonusActive = false;
 
   this.groundY = 320;
 
@@ -279,78 +276,68 @@ function create() {
 
   enemies = this.physics.add.group({ allowGravity: false });
   specialEnemies = this.physics.add.group({ allowGravity: false });
-  bonuses = this.physics.add.group({ allowGravity: true }); // бонусы падают с гравитацией
+  bonuses = this.physics.add.group({ allowGravity: true });
 
   // Столкновение с бонусом
   this.physics.add.overlap(player, bonuses, (playerObj, bonus) => {
     if (isDead || isPaused || showMenu) return;
-    
     if (!doubleJumpActive) {
       activateDoubleJumpBonus.call(this);
     }
+    if (bonus.getData('glow')) bonus.getData('glow').destroy();
     bonus.destroy();
     this.cameras.main.flash(200, 255, 215, 0);
   });
 
-  // Столкновение с обычными врагами
+  // Бонусы падают на землю
+  this.physics.add.collider(bonuses, this.ground, (bonus, ground) => {
+    bonus.body.setVelocityY(0);
+    bonus.body.setGravityY(0);
+  });
+
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     const enemyType = enemy.getData('type');
-    
     if (enemyType === 'low') {
-      if (player.body.blocked.down) {
-        playerHit.call(this);
-      }
+      if (player.body.blocked.down) playerHit.call(this);
     } else {
-      if (!isCrouching) {
-        playerHit.call(this);
-      }
+      if (!isCrouching) playerHit.call(this);
     }
     enemy.destroy();
   });
 
-  // Столкновение с золотыми/серебряными монстрами
   this.physics.add.overlap(player, specialEnemies, (playerObj, monster) => {
     if (isDead || isPaused || showMenu) return;
     const monsterData = monster.getData('type');
     const monsterHeight = monsterData === 'goldLow' || monsterData === 'silverLow' ? 'low' : 'high';
-    
     if (monsterHeight === 'low') {
-      if (player.body.blocked.down) {
-        playerHit.call(this);
-      }
+      if (player.body.blocked.down) playerHit.call(this);
     } else {
-      if (!isCrouching) {
-        playerHit.call(this);
-      }
+      if (!isCrouching) playerHit.call(this);
     }
     monster.destroy();
   });
 
-  // Генерация бонусов (кроссовок) с неба с рандомным шансом
+  // Генерация бонусов с уменьшенным размером
   bonusSpawnTimer = this.time.addEvent({
-    delay: 8000, // каждые 8 секунд проверяем
+    delay: 8000,
     loop: true,
     callback: () => {
       if (isDead || isPaused || showMenu) return;
-      if (doubleJumpActive) return; // если бонус уже активен, не спавним новый
-      
-      // 30% шанс спавна бонуса
-      if (Math.random() < 0.3) {
-        const bonusX = Math.random() * 600 + 100; // случайная позиция по X от 100 до 700
-        const bonusY = 50; // падает с неба
-        let bonus = bonuses.create(bonusX, bonusY, 'sneaker');
-        bonus.setScale(0.4);
-        bonus.body.setSize(40, 40, 10, 10);
-        bonus.setCollideWorldBounds(true);
-        bonus.setBounce(0.3);
+      if (doubleJumpActive) return;
+      if (Math.random() < 0.35) {
+        const bonusX = Math.random() * 600 + 100;
+        let bonus = bonuses.create(bonusX, 50, 'sneaker');
+        bonus.setScale(0.2); // Уменьшен в два раза (было 0.4, стало 0.2)
+        bonus.body.setSize(25, 25, 8, 8);
+        bonus.body.setCollideWorldBounds(true);
+        bonus.setBounce(0.2);
+        bonus.setData('scored', false);
         
-        // Добавляем свечение для бонуса
-        const bonusGlow = this.add.rectangle(bonus.x, bonus.y, 50, 50, 0xffaa44, 0.5);
-        bonusGlow.setStrokeStyle(3, 0xffdd88);
+        const bonusGlow = this.add.rectangle(bonus.x, bonus.y, 30, 30, 0xffaa44, 0.5);
+        bonusGlow.setStrokeStyle(2, 0xffdd88);
         bonus.setData('glow', bonusGlow);
         
-        // Обновляем позицию свечения вместе с бонусом
         this.tweens.add({
           targets: bonusGlow,
           alpha: { from: 0.5, to: 0.8 },
@@ -364,15 +351,18 @@ function create() {
   });
 
   // Обновление свечения бонусов
-  this.events.on('update', () => {
-    bonuses.children.iterate(bonus => {
-      if (bonus && bonus.getData('glow')) {
-        bonus.getData('glow').setPosition(bonus.x, bonus.y);
-      }
-    });
-  });
+  const updateGlow = () => {
+    if (bonuses) {
+      bonuses.children.iterate(bonus => {
+        if (bonus && bonus.getData('glow')) {
+          bonus.getData('glow').setPosition(bonus.x, bonus.y);
+        }
+      });
+    }
+  };
+  this.events.on('update', updateGlow);
 
-  // Генерация обычных врагов
+  // Генерация врагов
   this.time.addEvent({
     delay: 1400,
     loop: true,
@@ -401,18 +391,14 @@ function create() {
     callbackScope: this
   });
 
-  // Генерация золотых и серебряных монстров
   this.time.addEvent({
     delay: 2500,
     loop: true,
     callback: () => {
       if (isDead || isPaused || showMenu) return;
-      
       const isGold = Math.random() > 0.5;
       const isLow = Math.random() > 0.5;
-      
       let monsterType, monsterY, enemyWidth, enemyHeight, offsetX, offsetY, tintColor;
-      
       if (isLow) {
         monsterY = this.groundY + 48;
         enemyWidth = 320; enemyHeight = 320;
@@ -424,9 +410,7 @@ function create() {
         offsetX = -45; offsetY = -45;
         monsterType = isGold ? 'goldHigh' : 'silverHigh';
       }
-      
       tintColor = isGold ? 0xffd700 : 0xc0c0c0;
-      
       let monster = specialEnemies.create(-50, monsterY, 'enemy');
       monster.setVelocityX(enemiesStopped ? 0 : specialEnemiesSpeed);
       monster.setScale(0.2);
@@ -442,7 +426,6 @@ function create() {
 
   updateHeartsDisplay.call(this);
   
-  // Рамка для счёта
   scoreFrame = this.add.graphics();
   scoreFrame.fillStyle(0x000000, 0.7);
   scoreFrame.fillRoundedRect(10, 65, 140, 32, 8);
@@ -466,14 +449,13 @@ function create() {
 }
 
 function activateDoubleJumpBonus() {
+  if (doubleJumpActive) return;
   doubleJumpActive = true;
   
-  // Создаём свечение по контуру персонажа
   playerGlow = this.add.rectangle(player.x, player.y, 85, 85, 0xffaa44, 0.3);
   playerGlow.setStrokeStyle(4, 0xffdd88, 0.9);
   playerGlow.setDepth(500);
   
-  // Добавляем эффект пульсации
   this.tweens.add({
     targets: playerGlow,
     alpha: { from: 0.3, to: 0.6 },
@@ -483,7 +465,6 @@ function activateDoubleJumpBonus() {
     repeat: -1
   });
   
-  // Таймер на 15 секунд
   if (doubleJumpTimer) doubleJumpTimer.remove();
   doubleJumpTimer = this.time.delayedCall(15000, () => {
     doubleJumpActive = false;
@@ -491,11 +472,9 @@ function activateDoubleJumpBonus() {
       playerGlow.destroy();
       playerGlow = null;
     }
-    // Визуальное оповещение об окончании бонуса
     this.cameras.main.flash(300, 255, 200, 0);
   }, [], this);
   
-  // Визуальное оповещение о получении бонуса
   const bonusText = this.add.text(player.x, player.y - 50, 'ДВОЙНОЙ ПРЫЖОК!', { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace', fontWeight: 'bold' });
   bonusText.setOrigin(0.5);
   this.tweens.add({
@@ -507,14 +486,11 @@ function activateDoubleJumpBonus() {
   });
 }
 
-// Функция для двойного прыжка
 function performDoubleJump() {
   if (doubleJumpActive && !player.body.blocked.down && !jumpCooldown) {
-    player.setVelocityY(-420); // двойная высота прыжка
+    player.setVelocityY(-420);
     jumpCooldown = true;
     this.time.delayedCall(300, () => { jumpCooldown = false; });
-    
-    // Эффект двойного прыжка
     const jumpEffect = this.add.text(player.x, player.y - 20, '✧', { fontSize: '24px', fill: '#ffaa44' });
     jumpEffect.setOrigin(0.5);
     this.tweens.add({
@@ -637,7 +613,6 @@ function playerHit() {
   updateHeartsDisplay.call(this);
   this.cameras.main.flash(500, 255, 0, 0);
   
-  // При потере жизни сбрасываем бонус
   if (doubleJumpActive) {
     doubleJumpActive = false;
     if (playerGlow) {
@@ -648,16 +623,31 @@ function playerHit() {
   }
   
   if (lives <= 0) {
-    isDead = true; player.stop(); player.setTexture('run1'); player.setVelocityY(-300); player.setVelocityX(0); player.setTint(0xff0000);
+    isDead = true;
+    player.stop();
+    player.setTexture('run1');
+    player.setVelocityY(-300);
+    player.setVelocityX(0);
+    player.setTint(0xff0000);
     this.tweens.add({ targets: player, angle: 90, duration: 500, ease: 'Bounce.easeOut' });
-    deathTimer = this.time.delayedCall(1500, () => { this.scene.restart(); });
+    deathTimer = this.time.delayedCall(1500, () => {
+      this.scene.restart();
+    });
   } else {
-    isDead = true; player.setTint(0xff0000); player.setVelocityX(-300); player.setVelocityY(-200);
+    isDead = true;
+    player.setTint(0xff0000);
+    player.setVelocityX(-300);
+    player.setVelocityY(-200);
     enemies.children.iterate(enemy => { if (enemy) enemy.destroy(); });
     specialEnemies.children.iterate(monster => { if (monster) monster.destroy(); });
-    bonuses.children.iterate(bonus => { if (bonus) bonus.destroy(); });
+    bonuses.children.iterate(bonus => { if (bonus) {
+      if (bonus.getData('glow')) bonus.getData('glow').destroy();
+      bonus.destroy();
+    }});
     this.time.delayedCall(1000, () => {
-      isDead = false; player.clearTint(); player.setVelocityX(0);
+      isDead = false;
+      player.clearTint();
+      player.setVelocityX(0);
       this.tweens.add({ targets: player, alpha: 0.5, duration: 100, yoyo: true, repeat: 5, onComplete: () => { player.alpha = 1; } });
     });
   }
@@ -769,7 +759,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК (от низких врагов)\n↓ - ПРИСЕДАНИЕ (от высоких)\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от любого врага +1 очко\n❤️ 3 жизни\n✨ Золотые и серебряные монстры\n👟 Кроссовок с неба - двойной прыжок 15 сек!\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ\nНажмите ESC для выхода');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ');
     return;
   } else menuText.setVisible(false);
 
@@ -780,12 +770,10 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
-  // Обновляем позицию свечения персонажа
   if (playerGlow && player) {
     playerGlow.setPosition(player.x, player.y);
   }
 
-  // Начисление очков
   enemies.children.iterate(enemy => {
     if (enemy && enemy.x < -100 && !enemy.getData('scored')) {
       enemy.setData('scored', true);
@@ -848,7 +836,6 @@ function update() {
     player.setFlipX(false);
   }
   
-  // Прыжок с учетом бонуса двойного прыжка
   if (this.cursors.up.isDown && !jumpCooldown) {
     if (isOnGround && !isCrouching) {
       player.setVelocityY(doubleJumpActive ? -460 : -260);
