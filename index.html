@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — 6 огненных шаров + таймер</title>
+  <title>Runner Game — 6 огненных шаров + таймер (ИСПРАВЛЕНО)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * { user-select: none; touch-action: manipulation; }
@@ -51,10 +51,11 @@ function preload() {
   this.load.image('crouch', 'crouch.png'); this.load.image('enemy', 'enemy.png'); this.load.image('enemy2', 'enemy2.png'); this.load.image('enemy3', 'enemy3.png');
   this.load.image('heart', 'heart.png'); this.load.image('sneaker', 'sneaker.png'); this.load.image('fireball', 'fireball.png'); this.load.audio('bgMusic', 'music.mp3');
 }
+
 function create() {
   isDead = false; lives = 3; score = 0; isPaused = false; lastDirection = 'right'; isCrouching = false; enemiesStopped = false; showMenu = false;
   currentWeather = 'rain'; touchLeft = false; touchRight = false; touchCrouchActive = false; doubleJumpActive = false; canDoubleJump = false;
-  isInvincible = false; isRespawning = false; enemiesGenerationEnabled = true; fireShieldActive = false; fireballs = [];
+  isInvincible = false; isRespawning = false; enemiesGenerationEnabled = true; fireShieldActive = false; fireballs = []; fireShieldRotation = 0;
   this.groundY = 320;
   this.bg = this.add.image(400, 200, 'bg'); this.bg.displayWidth = 800; this.bg.displayHeight = 400;
   this.ground = this.physics.add.staticGroup(); const groundBlock = this.ground.create(400, this.groundY + 40).setDisplaySize(800, 40).refreshBody(); groundBlock.visible = false;
@@ -107,7 +108,7 @@ function create() {
   startRainVisuals.call(this); createDustParticles.call(this); initAudio.call(this); setupMobileControls.call(this);
 }
 
-// КРУГОВОЙ ТАЙМЕР ДЛЯ ОГНЕННЫХ ШАРОВ
+// КРУГОВОЙ ТАЙМЕР ДЛЯ ОГНЕННЫХ ШАРОВ (аналог кроссовка)
 function createFireShieldTimer() {
   if (fireShieldTimerGraphic) fireShieldTimerGraphic.destroy();
   if (fireShieldIcon) fireShieldIcon.destroy();
@@ -132,6 +133,10 @@ function updateFireShieldTimer() {
   if (!fireShieldActive) {
     if (fireShieldTimerGraphic) { fireShieldTimerGraphic.destroy(); fireShieldTimerGraphic = null; }
     if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; }
+    return;
+  }
+  if (!fireShieldTimerGraphic) {
+    createFireShieldTimer.call(this);
     return;
   }
   const elapsed = Date.now() - fireShieldStartTime;
@@ -166,11 +171,11 @@ function updateFireShieldTimer() {
 }
 
 function createFireShield() {
-  if (fireballs.length) fireballs.forEach(f => f.destroy());
+  if (fireballs.length) fireballs.forEach(f => { if (f) f.destroy(); });
   fireballs = [];
   for (let i = 0; i < 6; i++) {
     let fb = this.add.image(player.x, player.y, 'fireball');
-    fb.setScale(0.1); // Уменьшен в 1.5 раза (было 0.15)
+    fb.setScale(0.1);
     fb.setDepth(550);
     fb.setTint(0xff6600);
     fireballs.push(fb);
@@ -179,16 +184,18 @@ function createFireShield() {
 
 function updateFireShield() {
   if (!fireShieldActive) {
-    if (fireballs.length) { fireballs.forEach(f => f.destroy()); fireballs = []; }
+    if (fireballs.length) { fireballs.forEach(f => { if (f) f.destroy(); }); fireballs = []; }
     return;
   }
-  fireShieldRotation += 0.2; // Увеличенная скорость вращения
+  fireShieldRotation += 0.2;
   let radius = 50;
   for (let i = 0; i < fireballs.length; i++) {
-    let angle = fireShieldRotation + (i * Math.PI * 2 / fireballs.length);
-    let x = player.x + Math.cos(angle) * radius;
-    let y = player.y + Math.sin(angle) * radius - 15;
-    fireballs[i].setPosition(x, y);
+    if (fireballs[i]) {
+      let angle = fireShieldRotation + (i * Math.PI * 2 / fireballs.length);
+      let x = player.x + Math.cos(angle) * radius;
+      let y = player.y + Math.sin(angle) * radius - 15;
+      fireballs[i].setPosition(x, y);
+    }
   }
 }
 
@@ -201,7 +208,7 @@ function activateFireShieldBonus() {
   if (fireShieldTimer) fireShieldTimer.remove();
   fireShieldTimer = this.time.delayedCall(BONUS_DURATION, () => {
     fireShieldActive = false;
-    if (fireballs.length) { fireballs.forEach(f => f.destroy()); fireballs = []; }
+    if (fireballs.length) { fireballs.forEach(f => { if (f) f.destroy(); }); fireballs = []; }
     if (fireShieldTimerGraphic) { fireShieldTimerGraphic.destroy(); fireShieldTimerGraphic = null; }
     if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; }
   }, [], this);
@@ -230,6 +237,7 @@ function explosionTeleportEffect(respawnX, respawnY, onComplete) {
   });
 }
 
+let bonusTimerGraphic = null, bonusIcon = null, bonusStartTime = 0;
 function createBonusTimer() { if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); let radius = 18, x = player.x, y = player.y - 65; bonusTimerGraphic = this.add.graphics(); bonusTimerGraphic.setDepth(550); bonusTimerGraphic.x = x; bonusTimerGraphic.y = y; bonusTimerGraphic.fillStyle(0x000000, 0.7); bonusTimerGraphic.fillCircle(0, 0, radius + 3); bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.8); bonusTimerGraphic.strokeCircle(0, 0, radius); bonusIcon = this.add.image(x, y, 'sneaker'); bonusIcon.setScale(0.12); bonusIcon.setDepth(551); bonusIcon.setTint(0xffdd88); }
 function updateBonusTimer() { if (!doubleJumpActive) { if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); return; } let elapsed = Date.now() - bonusStartTime, remaining = Math.max(0, BONUS_DURATION - elapsed), percent = remaining / BONUS_DURATION; if (remaining <= 0) { if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); return; } let radius = 18, x = player.x, y = player.y - 65; if (bonusTimerGraphic) { bonusTimerGraphic.x = x; bonusTimerGraphic.y = y; bonusTimerGraphic.clear(); bonusTimerGraphic.fillStyle(0x000000, 0.7); bonusTimerGraphic.fillCircle(0, 0, radius + 3); bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.5); bonusTimerGraphic.strokeCircle(0, 0, radius); let angle = 360 * percent; bonusTimerGraphic.lineStyle(3, 0xffaa44, 1); bonusTimerGraphic.beginPath(); bonusTimerGraphic.arc(0, 0, radius - 2, 0, (angle * Math.PI) / 180, false); bonusTimerGraphic.strokePath(); } if (bonusIcon) { bonusIcon.x = x; bonusIcon.y = y; } }
 function activateDoubleJumpBonus() { if (doubleJumpActive) return; doubleJumpActive = true; canDoubleJump = true; bonusStartTime = Date.now(); createBonusTimer.call(this); let effect = this.add.circle(player.x, player.y, 30, 0xffaa44, 0.7); this.tweens.add({ targets: effect, scale: { from: 0.5, to: 2 }, alpha: 0, duration: 500, onComplete: () => effect.destroy() }); if (doubleJumpTimer) doubleJumpTimer.remove(); doubleJumpTimer = this.time.delayedCall(BONUS_DURATION, () => { doubleJumpActive = false; canDoubleJump = false; if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); }, [], this); let text = this.add.text(player.x, player.y - 50, 'ДВОЙНОЙ ПРЫЖОК!', { fontSize: '16px', fill: '#ffdd88', fontFamily: 'monospace' }); text.setOrigin(0.5); this.tweens.add({ targets: text, y: text.y - 40, alpha: 0, duration: 1000, onComplete: () => text.destroy() }); }
@@ -243,13 +251,14 @@ function startLightningVisuals() { rainDrops.forEach(d => d.destroy()); rainDrop
 function updateHeartsDisplay() { hearts.forEach(h => h.destroy()); hearts = []; for (let i = 0; i < lives; i++) hearts.push(this.add.image(30 + i * 40, 30, 'heart').setScale(0.5).setDepth(1000)); }
 function playerHit() { if (isDead || isPaused || showMenu || isRespawning) return; if (isInvincible) return; lives--; updateHeartsDisplay.call(this); damageEffect.call(this); isInvincible = true; player.setTint(0xff8888); if (invincibleTimer) invincibleTimer.remove(); invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this);
   if (lives <= 0) { isDead = true; isRespawning = true; player.stop(); player.setVisible(false); player.body.enable = false; resetTouchControls(); enemiesGenerationEnabled = false; enemies.children.iterate(e => { if (e) e.destroy(); }); specialEnemies.children.iterate(m => { if (m) m.destroy(); }); let respawnX = 200, respawnY = this.groundY;
-    explosionTeleportEffect.call(this, respawnX, respawnY, () => { player.setVisible(true); player.body.enable = true; player.clearTint(); player.setTexture('run1'); player.alpha = 1; lives = 3; updateHeartsDisplay.call(this); score = 0; updateScoreDisplay.call(this); isDead = false; isRespawning = false; isInvincible = true; player.setTint(0xff8888); if (invincibleTimer) invincibleTimer.remove(); invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this); enemiesGenerationEnabled = true; if (fireShieldActive) { fireShieldActive = false; if (fireballs.length) { fireballs.forEach(f => f.destroy()); fireballs = []; } if (fireShieldTimer) fireShieldTimer.remove(); if (fireShieldTimerGraphic) { fireShieldTimerGraphic.destroy(); fireShieldTimerGraphic = null; } if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; } } if (doubleJumpActive) { doubleJumpActive = false; canDoubleJump = false; if (doubleJumpTimer) doubleJumpTimer.remove(); if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); } });
+    explosionTeleportEffect.call(this, respawnX, respawnY, () => { player.setVisible(true); player.body.enable = true; player.clearTint(); player.setTexture('run1'); player.alpha = 1; lives = 3; updateHeartsDisplay.call(this); score = 0; updateScoreDisplay.call(this); isDead = false; isRespawning = false; isInvincible = true; player.setTint(0xff8888); if (invincibleTimer) invincibleTimer.remove(); invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this); enemiesGenerationEnabled = true; if (fireShieldActive) { fireShieldActive = false; if (fireballs.length) { fireballs.forEach(f => { if (f) f.destroy(); }); fireballs = []; } if (fireShieldTimer) fireShieldTimer.remove(); if (fireShieldTimerGraphic) { fireShieldTimerGraphic.destroy(); fireShieldTimerGraphic = null; } if (fireShieldIcon) { fireShieldIcon.destroy(); fireShieldIcon = null; } } if (doubleJumpActive) { doubleJumpActive = false; canDoubleJump = false; if (doubleJumpTimer) doubleJumpTimer.remove(); if (bonusTimerGraphic) bonusTimerGraphic.destroy(); if (bonusIcon) bonusIcon.destroy(); } });
   }
 }
 function createDustParticles() { dustParticles = this.add.particles(0, 0, null, { speed: { min: 20, max: 50 }, angle: { min: 150, max: 210 }, scale: { start: 0.3, end: 0 }, alpha: { start: 0.6, end: 0 }, lifespan: 400, quantity: 2, tint: 0x8B7355 }); let g = this.add.graphics(); g.fillStyle(0x8B7355, 1); g.fillCircle(4, 4, 4); g.generateTexture('dust', 8, 8); g.clear(); dustParticles.setTexture('dust').setDepth(800); }
 function addFootprint(x, y) { if (footprints.length > 30) footprints.shift().destroy(); let fp = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5).setDepth(600); this.tweens.add({ targets: fp, alpha: 0, duration: 5000, onComplete: () => fp.destroy() }); footprints.push(fp); }
 function initAudio() { try { if (backgroundMusic && backgroundMusic.isPlaying) return; if (backgroundMusic && !backgroundMusic.isPlaying) { if (!isMuted) backgroundMusic.resume(); return; } backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume }); backgroundMusic.play(); let slider = document.getElementById('volumeSlider'), val = document.getElementById('volumeValue'), icon = document.getElementById('audioIcon'); if (slider && !slider.hasListener) { slider.value = currentVolume * 100; val.textContent = Math.round(currentVolume * 100) + '%'; slider.hasListener = true; slider.addEventListener('input', (e) => { currentVolume = e.target.value / 100; val.textContent = e.target.value + '%'; if (backgroundMusic) backgroundMusic.setVolume(currentVolume); if (currentVolume === 0) { isMuted = true; icon.textContent = '🔇'; } else { isMuted = false; icon.textContent = '🔊'; } }); } } catch(e) { console.log("audio err", e); } }
-function setupMobileControls() { let btnL = document.getElementById('btnLeft'), btnR = document.getElementById('btnRight'), btnJ = document.getElementById('btnJump'), btnC = document.getElementById('btnCrouch'), btnP = document.getElementById('btnPause'), btnS = document.getElementById('btnStopEnemies'), btnW = document.getElementById('btnWeather'), btnM = document.getElementById('btnMenu');
+function setupMobileControls() { 
+  let btnL = document.getElementById('btnLeft'), btnR = document.getElementById('btnRight'), btnJ = document.getElementById('btnJump'), btnC = document.getElementById('btnCrouch'), btnP = document.getElementById('btnPause'), btnS = document.getElementById('btnStopEnemies'), btnW = document.getElementById('btnWeather'), btnM = document.getElementById('btnMenu');
   let setLeft = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning) touchLeft = s; }; let setRight = (s) => { if (!isDead && !showMenu && !isPaused && !isRespawning) touchRight = s; };
   btnL.addEventListener('touchstart', e => { e.preventDefault(); setLeft(true); }); btnL.addEventListener('touchend', e => { e.preventDefault(); setLeft(false); }); btnL.addEventListener('mousedown', () => setLeft(true)); btnL.addEventListener('mouseup', () => setLeft(false)); btnL.addEventListener('mouseleave', () => setLeft(false));
   btnR.addEventListener('touchstart', e => { e.preventDefault(); setRight(true); }); btnR.addEventListener('touchend', e => { e.preventDefault(); setRight(false); }); btnR.addEventListener('mousedown', () => setRight(true)); btnR.addEventListener('mouseup', () => setRight(false)); btnR.addEventListener('mouseleave', () => setRight(false));
