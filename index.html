@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — мобильный раннер</title>
+  <title>Runner Game — Mobile Touch Controls</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -13,62 +13,58 @@
     body {
       margin: 0;
       overflow: hidden;
-      background: #000;
+      background: #0a0f1e;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    
-    /* Аудио панель (десктоп/мобайл) */
+    /* Аудио панель (остается справа сверху) */
     .audio-control {
       position: fixed;
-      top: 10px;
-      right: 10px;
+      top: 12px;
+      right: 12px;
       z-index: 2000;
       background: rgba(0,0,0,0.7);
-      border-radius: 30px;
-      padding: 8px 15px;
+      backdrop-filter: blur(8px);
+      border-radius: 40px;
+      padding: 6px 14px;
       display: flex;
       align-items: center;
       gap: 10px;
       font-family: Arial, sans-serif;
-      backdrop-filter: blur(5px);
       border: 1px solid rgba(255,255,255,0.3);
       cursor: pointer;
-      transition: all 0.3s ease;
+      transition: all 0.2s ease;
     }
     .audio-control:hover {
       background: rgba(0,0,0,0.9);
-      transform: scale(1.05);
+      transform: scale(1.02);
     }
     .audio-icon {
-      font-size: 24px;
+      font-size: 22px;
       color: white;
     }
     .volume-slider {
-      width: 80px;
+      width: 70px;
       height: 4px;
       -webkit-appearance: none;
-      background: #444;
-      border-radius: 2px;
-      outline: none;
-      cursor: pointer;
+      background: #555;
+      border-radius: 4px;
     }
     .volume-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 12px;
-      height: 12px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
-      background: #fff;
+      background: white;
       cursor: pointer;
     }
     .volume-value {
       color: white;
-      font-size: 12px;
-      min-width: 35px;
-      text-align: center;
+      font-size: 11px;
+      min-width: 32px;
     }
-    
-    /* ===== МОБИЛЬНОЕ УПРАВЛЕНИЕ (сенсорные кнопки) ===== */
-    .mobile-controls {
+
+    /* ========== МОБИЛЬНЫЕ СЕНСОРНЫЕ КНОПКИ ========== */
+    .touch-panel {
       position: fixed;
       bottom: 20px;
       left: 0;
@@ -76,112 +72,95 @@
       display: flex;
       justify-content: space-between;
       align-items: flex-end;
-      padding: 0 15px 20px 15px;
-      z-index: 2500;
-      pointer-events: none;
+      padding: 0 16px 20px 16px;
+      gap: 15px;
+      z-index: 1800;
+      pointer-events: none; /* чтобы клики проходили сквозь фон */
     }
-    
-    .control-group {
-      display: flex;
-      gap: 18px;
-      background: rgba(20, 20, 40, 0.75);
-      backdrop-filter: blur(12px);
-      border-radius: 70px;
-      padding: 12px 20px;
-      border: 1px solid rgba(255,255,255,0.25);
-      box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+    .touch-panel button {
       pointer-events: auto;
-    }
-    
-    .ctrl-btn {
-      width: 65px;
-      height: 65px;
-      border-radius: 50%;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid rgba(255,255,255,0.8);
+      background: rgba(20, 25, 45, 0.85);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 60px;
+      color: white;
+      font-size: 28px;
+      font-weight: bold;
+      text-shadow: 0 2px 3px black;
+      width: 70px;
+      height: 70px;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+      transition: 0.07s linear;
+      touch-action: manipulation;
+      cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 36px;
-      font-weight: bold;
-      color: white;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
-      transition: 0.05s linear;
-      touch-action: manipulation;
-      cursor: pointer;
+      font-family: monospace;
+    }
+    /* Группа левых кнопок */
+    .left-group {
+      display: flex;
+      gap: 16px;
+      background: rgba(0,0,0,0.3);
+      padding: 10px 18px;
+      border-radius: 100px;
       backdrop-filter: blur(4px);
     }
-    
-    .ctrl-btn:active {
-      transform: scale(0.92);
-      background: rgba(100, 100, 200, 0.85);
-      border-color: #ffcc44;
+    .right-group {
+      display: flex;
+      gap: 16px;
+      background: rgba(0,0,0,0.3);
+      padding: 10px 18px;
+      border-radius: 100px;
+      backdrop-filter: blur(4px);
     }
-    
-    /* Спец. кнопки в середине */
-    .special-group {
+    /* Спец кнопки по центру внизу? но оставим удобно */
+    .center-group {
+      display: flex;
       gap: 15px;
+      background: rgba(0,0,0,0.3);
+      padding: 8px 15px;
+      border-radius: 100px;
+      backdrop-filter: blur(4px);
     }
-    
-    .ctrl-special {
-      width: 60px;
-      height: 60px;
-      font-size: 28px;
-      background: rgba(40, 40, 70, 0.85);
+    button:active {
+      transform: scale(0.92);
+      background: rgba(100, 150, 220, 0.9);
+      border-color: #ffcc88;
     }
-    
-    /* Адаптивность */
+    /* подпись для мобильных (маленькая) */
+    .btn-label {
+      font-size: 12px;
+      position: absolute;
+      bottom: -18px;
+      color: #ddd;
+      background: rgba(0,0,0,0.5);
+      padding: 2px 6px;
+      border-radius: 20px;
+      white-space: nowrap;
+      font-weight: normal;
+    }
+    .touch-panel button {
+      position: relative;
+    }
     @media (max-width: 700px) {
-      .ctrl-btn { width: 55px; height: 55px; font-size: 30px; }
-      .ctrl-special { width: 52px; height: 52px; font-size: 24px; }
-      .control-group { gap: 12px; padding: 10px 16px; }
-      .mobile-controls { padding: 0 10px 15px 10px; }
+      .touch-panel button { width: 60px; height: 60px; font-size: 24px; }
+      .btn-label { font-size: 10px; bottom: -16px; }
+      .left-group, .right-group, .center-group { padding: 6px 12px; gap: 12px; }
     }
-    
     @media (max-width: 550px) {
-      .ctrl-btn { width: 48px; height: 48px; font-size: 26px; }
-      .ctrl-special { width: 45px; height: 45px; font-size: 22px; }
-      .control-group { gap: 10px; padding: 8px 14px; }
+      .touch-panel button { width: 54px; height: 54px; font-size: 22px; }
+      .left-group, .right-group { gap: 10px; padding: 5px 10px; }
     }
-    
-    /* скрываем на десктопе если не нужно, но можно показывать для удобства */
-    @media (hover: hover) and (pointer: fine) {
-      .mobile-controls {
+    /* для десктопа кнопки тоже полезны (можно скрыть, но пусть будут, не мешают) */
+    @media (min-width: 1024px) {
+      .touch-panel {
         opacity: 0.85;
       }
-      .ctrl-btn:hover {
-        background: rgba(80,80,150,0.9);
-        transform: scale(1.02);
-      }
-    }
-    
-    /* небольшая подсказка на мобильных */
-    .touch-hint {
-      position: fixed;
-      bottom: 100px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0,0,0,0.6);
-      color: #ffdd99;
-      font-size: 11px;
-      padding: 4px 12px;
-      border-radius: 20px;
-      pointer-events: none;
-      z-index: 2600;
-      white-space: nowrap;
-      font-family: monospace;
-      backdrop-filter: blur(4px);
-    }
-    
-    @media (max-width: 800px) {
-      .touch-hint { display: block; }
-    }
-    @media (min-width: 801px) {
-      .touch-hint { display: none; }
     }
   </style>
 </head>
-
 <body>
 <div class="audio-control" id="audioControl">
   <div class="audio-icon" id="audioIcon">🔊</div>
@@ -189,515 +168,529 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- МОБИЛЬНЫЕ СЕНСОРНЫЕ КНОПКИ -->
-<div class="mobile-controls">
-  <div class="control-group left-group">
-    <div class="ctrl-btn" id="btnLeft">◀</div>
-    <div class="ctrl-btn" id="btnRight">▶</div>
+<!-- СЕНСОРНЫЕ КНОПКИ МОБИЛЬНОГО УПРАВЛЕНИЯ -->
+<div class="touch-panel">
+  <div class="left-group">
+    <button id="btnLeft" data-action="left">◀</button>
+    <button id="btnRight" data-action="right">▶</button>
+    <button id="btnJump" data-action="jump">▲</button>
   </div>
-  <div class="control-group special-group">
-    <div class="ctrl-btn ctrl-special" id="btnJump">↑</div>
-    <div class="ctrl-btn ctrl-special" id="btnCrouch">↓</div>
+  <div class="center-group">
+    <button id="btnCrouch" data-action="crouch">▼<span class="btn-label" style="bottom:-20px;">присед</span></button>
+    <button id="btnPause" data-action="pause">⏸️</button>
+    <button id="btnStopEnemies" data-action="stopEnemies">⏹️<span class="btn-label" style="bottom:-20px;">стоп враг</span></button>
+    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label" style="bottom:-20px;">погода(W)</span></button>
   </div>
-  <div class="control-group right-group">
-    <div class="ctrl-btn ctrl-special" id="btnPause">⏸</div>
-    <div class="ctrl-btn ctrl-special" id="btnStopEnemy">⏹️</div>
-    <div class="ctrl-btn ctrl-special" id="btnWeather">🌦️</div>
+  <div class="right-group">
+    <button id="btnMenu" data-action="menu">📜<span class="btn-label">меню</span></button>
   </div>
 </div>
-<div class="touch-hint">✦ Сенсорные кнопки: движение / прыжок / присед ✦</div>
 
 <script>
-  (function() {
-    // ------ ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ (синхронизация с игрой) ------
-    let player;
-    let enemies;
-    let isDead = false;
-    let deathTimer;
-    let lives = 3;
-    let hearts = [];
-    let isPaused = false;
-    let enemiesSpeed = -200;
-    let lastDirection = 'right';
-    let isCrouching = false;
-    let enemiesStopped = false;
-    let showMenu = false;
-    let menuText;
-    
-    let backgroundMusic = null;
-    let isMuted = false;
-    let currentVolume = 0.5;
-    let musicStarted = false;
-    
-    let rainDrops = [];
-    let rainStreaks = [];
-    let lightningFlash;
-    let lightningTimer;
-    let currentWeather = 'rain';
-    
-    let dustParticles;
-    let footprints = [];
-    let footprintDelay = 0;
-    
-    let gameSceneRef = null;   // ссылка на активную сцену для вызовов методов
-    
-    // Функция чтобы получать доступ к сцене из колбэков кнопок
-    function getScene() {
-      return gameSceneRef;
+// ---------- Глобальные переменные игровой логики ----------
+let player;
+let enemies;
+let isDead = false;
+let deathTimer;
+let lives = 3;
+let hearts = [];
+let isPaused = false;
+let enemiesSpeed = -200;
+let lastDirection = 'right';
+let isCrouching = false;
+let enemiesStopped = false;
+let showMenu = false;
+let menuText;
+let backgroundMusic = null;
+let isMuted = false;
+let currentVolume = 0.5;
+let musicStarted = false;
+
+let rainDrops = [];
+let rainStreaks = [];
+let lightningFlash;
+let lightningTimer;
+let currentWeather = 'rain';
+
+let dustParticles;
+let footprints = [];
+let footprintDelay = 0;
+
+// Для обработки мобильных кнопок (эмуляция клавиш)
+let touchLeft = false;
+let touchRight = false;
+let touchJumpQueued = false;
+let touchCrouchQueued = false;
+
+// Флаг, чтобы не спамить прыжок каждый кадр
+let jumpCooldown = false;
+
+const game = new Phaser.Game({
+  type: Phaser.AUTO,
+  scale: {
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: 800,
+    height: 400
+  },
+  physics: {
+    default: 'arcade',
+    arcade: { gravity: { y: 800 } }
+  },
+  scene: {
+    preload,
+    create,
+    update
+  }
+});
+
+function preload() {
+  this.load.image('bg', 'bg.png');
+  this.load.image('run1', 'run1.png');
+  this.load.image('run2', 'run2.png');
+  this.load.image('run3', 'run3.png');
+  this.load.image('run4', 'run4.png');
+  this.load.image('crouch', 'crouch.png');
+  this.load.image('enemy', 'enemy.png');
+  this.load.image('enemy2', 'enemy2.png');
+  this.load.image('enemy3', 'enemy3.png');
+  this.load.image('heart', 'heart.png');
+  this.load.audio('bgMusic', 'music.mp3');
+}
+
+function create() {
+  isDead = false;
+  lives = 3;
+  isPaused = false;
+  lastDirection = 'right';
+  isCrouching = false;
+  enemiesStopped = false;
+  showMenu = false;
+  currentWeather = 'rain';
+  touchLeft = false;
+  touchRight = false;
+  touchJumpQueued = false;
+  touchCrouchQueued = false;
+
+  this.groundY = 320;
+
+  this.bg = this.add.image(400, 200, 'bg');
+  this.bg.displayWidth = 800;
+  this.bg.displayHeight = 400;
+
+  this.ground = this.physics.add.staticGroup();
+  const groundBlock = this.ground.create(400, this.groundY + 40).setDisplaySize(800, 40).refreshBody();
+  groundBlock.visible = false;
+
+  player = this.physics.add.sprite(200, this.groundY, 'run1');
+  player.setScale(0.25);
+  player.setCollideWorldBounds(true);
+  this.physics.add.collider(player, this.ground);
+  player.body.setSize(55, 58, 1, 2);
+
+  this.anims.create({
+    key: 'run',
+    frames: [{ key: 'run1' }, { key: 'run2' }, { key: 'run3' }, { key: 'run4' }],
+    frameRate: 10,
+    repeat: -1
+  });
+  this.anims.create({
+    key: 'enemyAnim',
+    frames: [{ key: 'enemy' }, { key: 'enemy2' }, { key: 'enemy3' }, { key: 'enemy2' }],
+    frameRate: 8,
+    repeat: -1
+  });
+
+  this.cursors = this.input.keyboard.createCursorKeys();
+
+  // ---- КЛАВИАТУРНЫЕ КОМАНДЫ (оставляем) ----
+  this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu) { isPaused = !isPaused; managePause.call(this); } });
+  this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu) toggleEnemiesStop.call(this); });
+  this.input.keyboard.on('keydown-ESC', () => { if (!isDead) toggleMenu.call(this); });
+  this.input.keyboard.on('keydown-W', () => { if (!isDead && !showMenu) toggleWeather.call(this); });
+
+  enemies = this.physics.add.group({ allowGravity: false });
+
+  // Столкновение с врагами
+  this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
+    if (isDead || isPaused || showMenu) return;
+    const enemyType = enemy.getData('type');
+    if (enemyType === 'low') {
+      if (player.body.blocked.down) playerHit.call(this);
+      enemy.destroy();
+    } else {
+      if (!isCrouching) playerHit.call(this);
+      enemy.destroy();
     }
-    
-    // Вспомогательные функции для управления (будут переопределены после создания сцены)
-    let externalJump = false, externalCrouch = false, externalLeft = false, externalRight = false;
-    let externalPauseFlag = false, externalStopToggle = false, externalWeatherToggle = false;
-    let lastExternalPauseState = false, lastExternalStopState = false, lastWeatherState = false;
-    
-    // Создание игры
-    const game = new Phaser.Game({
-      type: Phaser.AUTO,
-      scale: {
-        mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
-        width: 800,
-        height: 400
-      },
-      physics: {
-        default: 'arcade',
-        arcade: { gravity: { y: 800 } }
-      },
-      scene: {
-        preload,
-        create,
-        update
+  });
+
+  // Генерация врагов
+  this.time.addEvent({
+    delay: 1400,
+    loop: true,
+    callback: () => {
+      if (isDead || isPaused || showMenu) return;
+      const enemyType = Math.random() > 0.5 ? 'low' : 'high';
+      let enemyY, enemyWidth, enemyHeight, offsetX, offsetY;
+      if (enemyType === 'low') {
+        enemyY = this.groundY + 48;
+        enemyWidth = 320; enemyHeight = 320;
+        offsetX = -35; offsetY = -35;
+      } else {
+        enemyY = this.groundY - 15;
+        enemyWidth = 180; enemyHeight = 180;
+        offsetX = -45; offsetY = -45;
+      }
+      let enemy = enemies.create(850, enemyY, 'enemy');
+      if (!enemiesStopped) enemy.setVelocityX(enemiesSpeed);
+      else enemy.setVelocityX(0);
+      enemy.setScale(0.2);
+      enemy.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
+      enemy.play('enemyAnim');
+      enemy.setData('type', enemyType);
+      enemy.setTint(enemyType === 'low' ? 0xff6666 : 0xaa66ff);
+    },
+    callbackScope: this
+  });
+
+  updateHeartsDisplay.call(this);
+
+  menuText = this.add.text(400, 200, '', { fontSize: '20px', fill: '#ffffff', backgroundColor: '#000000', padding: { x: 20, y: 20 }, align: 'center' });
+  menuText.setOrigin(0.5).setDepth(2000).setVisible(false);
+
+  lightningFlash = this.add.rectangle(400, 200, 800, 400, 0xffffff, 0).setDepth(1500).setVisible(false);
+
+  startRainVisuals.call(this);
+  createDustParticles.call(this);
+  initAudio.call(this);
+
+  // ---------- МОБИЛЬНЫЕ КНОПКИ: обработка событий ----------
+  setupMobileControls.call(this);
+}
+
+// ========== ФУНКЦИИ УПРАВЛЕНИЯ СОСТОЯНИЕМ ==========
+function managePause() {
+  if (isPaused) {
+    this.physics.world.pause();
+    if (dustParticles) dustParticles.pause();
+    if (backgroundMusic && !isMuted) backgroundMusic.pause();
+  } else {
+    this.physics.world.resume();
+    if (dustParticles) dustParticles.resume();
+    if (backgroundMusic && !isMuted && !isPaused) backgroundMusic.resume();
+  }
+}
+
+function toggleEnemiesStop() {
+  enemiesStopped = !enemiesStopped;
+  enemies.children.iterate(function (enemy) {
+    if (enemy && enemy.body) {
+      if (enemiesStopped) enemy.body.setVelocityX(0);
+      else enemy.body.setVelocityX(enemiesSpeed);
+    }
+  });
+}
+
+function toggleMenu() {
+  if (isDead) return;
+  showMenu = !showMenu;
+  if (showMenu) {
+    this.physics.world.pause();
+    if (dustParticles) dustParticles.pause();
+    if (backgroundMusic && !isMuted) backgroundMusic.pause();
+  } else {
+    if (!isPaused) {
+      this.physics.world.resume();
+      if (dustParticles) dustParticles.resume();
+      if (backgroundMusic && !isMuted) backgroundMusic.resume();
+    }
+  }
+}
+
+function toggleWeather() {
+  if (isDead || showMenu) return;
+  if (currentWeather === 'rain') {
+    currentWeather = 'lightning';
+    startLightningVisuals.call(this);
+  } else {
+    currentWeather = 'rain';
+    startRainVisuals.call(this);
+  }
+}
+
+// ========== ВИЗУАЛ ПОГОДА ==========
+function startRainVisuals() {
+  if (lightningTimer) lightningTimer.remove();
+  rainDrops.forEach(d => d.destroy()); rainDrops = [];
+  rainStreaks.forEach(s => s.destroy()); rainStreaks = [];
+  for (let i = 0; i < 150; i++) {
+    const drop = this.add.rectangle(Math.random() * 800, Math.random() * 400, 2, Math.random() * 8 + 4, 0x88aaff, Math.random() * 0.5 + 0.3);
+    drop.setDepth(500); rainDrops.push(drop);
+  }
+  for (let i = 0; i < 50; i++) {
+    const streak = this.add.rectangle(Math.random() * 800, Math.random() * 400, 1, Math.random() * 15 + 10, 0xaaccff, Math.random() * 0.4 + 0.2);
+    streak.setDepth(501); rainStreaks.push(streak);
+  }
+  this.bg.setTint(0x6688aa).setAlpha(0.9);
+}
+
+function startLightningVisuals() {
+  rainDrops.forEach(d => d.destroy()); rainDrops = [];
+  rainStreaks.forEach(s => s.destroy()); rainStreaks = [];
+  this.bg.clearTint().setAlpha(1);
+  if (lightningTimer) lightningTimer.remove();
+  lightningTimer = this.time.addEvent({ delay: 4000, callback: () => {
+    if (isPaused || showMenu || isDead) return;
+    lightningFlash.setVisible(true).setAlpha(0.8);
+    this.tweens.add({ targets: lightningFlash, alpha: 0, duration: 200, onComplete: () => { lightningFlash.setVisible(false); lightningFlash.setAlpha(0.8); } });
+    this.cameras.main.shake(150, 0.015);
+    const lightningBolt = this.add.graphics();
+    const startX = Math.random() * 800;
+    let currentX = startX, currentY = 0;
+    lightningBolt.lineStyle(4, 0xffdd88, 1).beginPath().moveTo(startX, 0);
+    for (let i = 0; i < 12; i++) { currentX += (Math.random() - 0.5) * 50; currentY += 35; lightningBolt.lineTo(currentX, currentY); }
+    lightningBolt.strokePath().setDepth(1501);
+    this.time.delayedCall(150, () => lightningBolt.destroy());
+  }, callbackScope: this, loop: true });
+}
+
+function updateHeartsDisplay() {
+  hearts.forEach(h => h.destroy()); hearts = [];
+  for (let i = 0; i < lives; i++) {
+    const heart = this.add.image(30 + (i * 40), 30, 'heart').setScale(0.5).setDepth(1000);
+    hearts.push(heart);
+  }
+}
+
+function playerHit() {
+  if (isDead || isPaused || showMenu) return;
+  lives--;
+  updateHeartsDisplay.call(this);
+  this.cameras.main.flash(500, 255, 0, 0);
+  if (lives <= 0) {
+    isDead = true; player.stop(); player.setTexture('run1'); player.setVelocityY(-300); player.setVelocityX(0); player.setTint(0xff0000);
+    this.tweens.add({ targets: player, angle: 90, duration: 500, ease: 'Bounce.easeOut' });
+    deathTimer = this.time.delayedCall(1500, () => { this.scene.restart(); });
+  } else {
+    isDead = true; player.setTint(0xff0000); player.setVelocityX(-300); player.setVelocityY(-200);
+    enemies.children.iterate(enemy => { if (enemy) enemy.destroy(); });
+    this.time.delayedCall(1000, () => {
+      isDead = false; player.clearTint(); player.setVelocityX(0);
+      this.tweens.add({ targets: player, alpha: 0.5, duration: 100, yoyo: true, repeat: 5, onComplete: () => { player.alpha = 1; } });
+    });
+  }
+}
+
+function createDustParticles() {
+  dustParticles = this.add.particles(0, 0, null, { speed: { min: 20, max: 50 }, angle: { min: 150, max: 210 }, scale: { start: 0.3, end: 0 }, alpha: { start: 0.6, end: 0 }, lifespan: 400, quantity: 2, tint: 0x8B7355 });
+  const graphics = this.add.graphics(); graphics.fillStyle(0x8B7355, 1); graphics.fillCircle(4, 4, 4); graphics.generateTexture('dust', 8, 8); graphics.clear();
+  dustParticles.setTexture('dust').setDepth(800);
+}
+function addFootprint(x, y) {
+  if (footprints.length > 30) footprints.shift().destroy();
+  const fp = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5).setDepth(600);
+  this.tweens.add({ targets: fp, alpha: 0, duration: 5000, onComplete: () => fp.destroy() });
+  footprints.push(fp);
+}
+
+// МУЗЫКА
+function initAudio() {
+  try {
+    if (backgroundMusic && backgroundMusic.isPlaying) return;
+    if (backgroundMusic && !backgroundMusic.isPlaying) { if (!isMuted) backgroundMusic.resume(); return; }
+    backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
+    backgroundMusic.play(); musicStarted = true;
+    setupAudioControls();
+  } catch(e) { console.log("audio err", e); }
+}
+function setupAudioControls() {
+  const audioControl = document.getElementById('audioControl');
+  const volumeSlider = document.getElementById('volumeSlider');
+  const volumeValue = document.getElementById('volumeValue');
+  const audioIcon = document.getElementById('audioIcon');
+  if (volumeSlider && !volumeSlider.hasListener) {
+    volumeSlider.value = currentVolume * 100; volumeValue.textContent = Math.round(currentVolume * 100) + '%';
+    volumeSlider.hasListener = true;
+    volumeSlider.addEventListener('input', (e) => {
+      currentVolume = e.target.value / 100; volumeValue.textContent = e.target.value + '%';
+      if (backgroundMusic) backgroundMusic.setVolume(currentVolume);
+      if (currentVolume === 0) { isMuted = true; audioIcon.textContent = '🔇'; } else { isMuted = false; audioIcon.textContent = '🔊'; }
+    });
+    audioControl.addEventListener('click', (e) => {
+      if (e.target !== volumeSlider) {
+        if (isMuted) { currentVolume = 0.5; volumeSlider.value = 50; volumeValue.textContent = '50%'; if (backgroundMusic) backgroundMusic.setVolume(0.5); audioIcon.textContent = '🔊'; isMuted = false; }
+        else { currentVolume = 0; volumeSlider.value = 0; volumeValue.textContent = '0%'; if (backgroundMusic) backgroundMusic.setVolume(0); audioIcon.textContent = '🔇'; isMuted = true; }
       }
     });
-    
-    // ---------- ASSETS ----------
-    function preload() {
-      this.load.image('bg', 'bg.png');
-      this.load.image('run1', 'run1.png');
-      this.load.image('run2', 'run2.png');
-      this.load.image('run3', 'run3.png');
-      this.load.image('run4', 'run4.png');
-      this.load.image('crouch', 'crouch.png');
-      this.load.image('enemy', 'enemy.png');
-      this.load.image('enemy2', 'enemy2.png');
-      this.load.image('enemy3', 'enemy3.png');
-      this.load.image('heart', 'heart.png');
-      this.load.audio('bgMusic', 'music.mp3');
+    volumeSlider.addEventListener('click', (e) => e.stopPropagation());
+  }
+}
+
+// ========== МОБИЛЬНЫЕ КНОПКИ: подключение ==========
+function setupMobileControls() {
+  const btnLeft = document.getElementById('btnLeft');
+  const btnRight = document.getElementById('btnRight');
+  const btnJump = document.getElementById('btnJump');
+  const btnCrouch = document.getElementById('btnCrouch');
+  const btnPause = document.getElementById('btnPause');
+  const btnStopEnemies = document.getElementById('btnStopEnemies');
+  const btnWeather = document.getElementById('btnWeather');
+  const btnMenu = document.getElementById('btnMenu');
+
+  // Left / Right (зажатие)
+  const setTouchLeft = (state) => { if (!isDead && !showMenu && !isPaused) touchLeft = state; };
+  const setTouchRight = (state) => { if (!isDead && !showMenu && !isPaused) touchRight = state; };
+  
+  btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); setTouchLeft(true); });
+  btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); setTouchLeft(false); });
+  btnLeft.addEventListener('mousedown', () => setTouchLeft(true));
+  btnLeft.addEventListener('mouseup', () => setTouchLeft(false));
+  btnLeft.addEventListener('mouseleave', () => setTouchLeft(false));
+  
+  btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); setTouchRight(true); });
+  btnRight.addEventListener('touchend', (e) => { e.preventDefault(); setTouchRight(false); });
+  btnRight.addEventListener('mousedown', () => setTouchRight(true));
+  btnRight.addEventListener('mouseup', () => setTouchRight(false));
+  btnRight.addEventListener('mouseleave', () => setTouchRight(false));
+
+  // Jump (однократно)
+  const doJump = () => {
+    if (isDead || isPaused || showMenu) return;
+    if (player.body.blocked.down && !jumpCooldown && !isCrouching) {
+      player.setVelocityY(-260);
+      jumpCooldown = true;
+      this.time.delayedCall(200, () => { jumpCooldown = false; });
     }
-    
-    // Переиспользуемые функции сцены (привязываем this)
-    function startRainVisuals() {
-      if (!this) return;
-      rainDrops.forEach(drop => drop && drop.destroy());
-      rainDrops = [];
-      rainStreaks.forEach(streak => streak && streak.destroy());
-      rainStreaks = [];
-      for (let i = 0; i < 150; i++) {
-        const drop = this.add.rectangle(
-          Math.random() * 800, Math.random() * 400, 2, Math.random() * 8 + 4, 0x88aaff, Math.random() * 0.5 + 0.3
-        );
-        drop.setDepth(500);
-        rainDrops.push(drop);
-      }
-      for (let i = 0; i < 50; i++) {
-        const streak = this.add.rectangle(
-          Math.random() * 800, Math.random() * 400, 1, Math.random() * 15 + 10, 0xaaccff, Math.random() * 0.4 + 0.2
-        );
-        streak.setDepth(501);
-        rainStreaks.push(streak);
-      }
-      if (this.bg) {
-        this.bg.setTint(0x6688aa);
-        this.bg.setAlpha(0.9);
-      }
-      if (lightningTimer) lightningTimer.remove();
+  };
+  btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
+  btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
+
+  // Crouch (зажатие/отжатие)
+  let crouchActive = false;
+  const updateCrouch = () => {
+    if (isDead || isPaused || showMenu) {
+      if (crouchActive) { crouchActive = false; isCrouching = false; if(player.body) player.body.setSize(55, 58, 1, 2); player.setTexture('run1'); }
+      return;
     }
-    
-    function startLightningVisuals() {
-      if (!this) return;
-      rainDrops.forEach(drop => drop && drop.destroy());
-      rainDrops = [];
-      rainStreaks.forEach(streak => streak && streak.destroy());
-      rainStreaks = [];
-      if (this.bg) {
-        this.bg.clearTint();
-        this.bg.setAlpha(1);
-      }
-      if (lightningTimer) lightningTimer.remove();
-      lightningTimer = this.time.addEvent({ delay: 4000, callback: () => {
-        if (isPaused || showMenu || isDead || !this.scene.isActive()) return;
-        if (lightningFlash) {
-          lightningFlash.setVisible(true);
-          lightningFlash.setAlpha(0.8);
-          this.tweens.add({
-            targets: lightningFlash,
-            alpha: 0,
-            duration: 200,
-            onComplete: () => { if(lightningFlash) { lightningFlash.setVisible(false); lightningFlash.setAlpha(0.8); } }
-          });
-        }
-        this.cameras.main.shake(150, 0.015);
-        const lightningBolt = this.add.graphics();
-        const startX = Math.random() * 800;
-        let currentX = startX;
-        let currentY = 0;
-        lightningBolt.lineStyle(4, 0xffdd88, 1);
-        lightningBolt.beginPath();
-        lightningBolt.moveTo(startX, 0);
-        for (let i = 0; i < 12; i++) {
-          currentX += (Math.random() - 0.5) * 50;
-          currentY += 35;
-          lightningBolt.lineTo(currentX, currentY);
-        }
-        lightningBolt.strokePath();
-        lightningBolt.setDepth(1501);
-        this.time.delayedCall(150, () => lightningBolt.destroy());
-      }, callbackScope: this, loop: true });
-    }
-    
-    function updateHeartsDisplay() {
-      if (!this) return;
-      hearts.forEach(heart => heart && heart.destroy());
-      hearts = [];
-      for (let i = 0; i < lives; i++) {
-        const heart = this.add.image(30 + (i * 40), 30, 'heart');
-        heart.setScale(0.5);
-        heart.setDepth(1000);
-        hearts.push(heart);
-      }
-    }
-    
-    function playerHit() {
-      if (isDead || isPaused || showMenu) return;
-      lives--;
-      updateHeartsDisplay.call(this);
-      this.cameras.main.flash(500, 255, 0, 0);
-      if (lives <= 0) {
-        isDead = true;
-        player.stop();
-        player.setTexture('run1');
-        player.setVelocityY(-300);
-        player.setVelocityX(0);
-        player.setTint(0xff0000);
-        this.tweens.add({
-          targets: player,
-          angle: 90,
-          duration: 500,
-          ease: 'Bounce.easeOut'
-        });
-        deathTimer = this.time.delayedCall(1500, () => {
-          this.scene.restart();
-        });
-      } else {
-        isDead = true;
-        player.setTint(0xff0000);
-        player.setVelocityX(-300);
-        player.setVelocityY(-200);
-        if (enemies) {
-          enemies.children.iterate(function (enemy) {
-            if (enemy) enemy.destroy();
-          });
-        }
-        this.time.delayedCall(1000, () => {
-          isDead = false;
-          player.clearTint();
-          player.setVelocityX(0);
-          this.tweens.add({
-            targets: player,
-            alpha: 0.5,
-            duration: 100,
-            yoyo: true,
-            repeat: 5,
-            onComplete: () => { player.alpha = 1; }
-          });
-        });
-      }
-    }
-    
-    function createDustParticles() {
-      const dustGraphics = this.add.graphics();
-      dustGraphics.fillStyle(0x8B7355, 1);
-      dustGraphics.fillCircle(4, 4, 4);
-      dustGraphics.generateTexture('dust', 8, 8);
-      dustGraphics.clear();
-      dustParticles = this.add.particles(0, 0, 'dust', {
-        speed: { min: 20, max: 50 },
-        angle: { min: 150, max: 210 },
-        scale: { start: 0.3, end: 0 },
-        alpha: { start: 0.6, end: 0 },
-        lifespan: 400,
-        quantity: 2,
-        tint: 0x8B7355
-      });
-      dustParticles.setDepth(800);
-    }
-    
-    function addFootprint(x, y) {
-      if (footprints.length > 30) {
-        const oldest = footprints.shift();
-        if(oldest) oldest.destroy();
-      }
-      const footprint = this.add.ellipse(x, y + 15, 8, 5, 0x5C4033, 0.5);
-      footprint.setDepth(600);
-      this.tweens.add({
-        targets: footprint,
-        alpha: 0,
-        duration: 5000,
-        onComplete: () => footprint.destroy()
-      });
-      footprints.push(footprint);
-    }
-    
-    function initAudio() {
-      try {
-        if (backgroundMusic && backgroundMusic.isPlaying) return;
-        if (backgroundMusic && !backgroundMusic.isPlaying && !isMuted) {
-          backgroundMusic.resume();
-          return;
-        }
-        backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
-        backgroundMusic.play();
-        musicStarted = true;
-        setupAudioControls();
-      } catch(e) { console.log("audio init issue", e); }
-    }
-    
-    function setupAudioControls() {
-      const audioControl = document.getElementById('audioControl');
-      const volumeSlider = document.getElementById('volumeSlider');
-      const volumeValue = document.getElementById('volumeValue');
-      const audioIcon = document.getElementById('audioIcon');
-      if (volumeSlider && !volumeSlider.hasListener) {
-        volumeSlider.value = currentVolume * 100;
-        volumeValue.textContent = Math.round(currentVolume * 100) + '%';
-        volumeSlider.hasListener = true;
-        volumeSlider.addEventListener('input', (e) => {
-          currentVolume = e.target.value / 100;
-          volumeValue.textContent = e.target.value + '%';
-          if (backgroundMusic) backgroundMusic.setVolume(currentVolume);
-          if (currentVolume === 0) { isMuted = true; audioIcon.textContent = '🔇'; }
-          else { isMuted = false; audioIcon.textContent = '🔊'; }
-        });
-        audioControl.addEventListener('click', (e) => {
-          if (e.target !== volumeSlider) {
-            if (isMuted) {
-              currentVolume = 0.5;
-              volumeSlider.value = 50;
-              volumeValue.textContent = '50%';
-              if (backgroundMusic) backgroundMusic.setVolume(0.5);
-              audioIcon.textContent = '🔊';
-              isMuted = false;
-            } else {
-              currentVolume = 0;
-              volumeSlider.value = 0;
-              volumeValue.textContent = '0%';
-              if (backgroundMusic) backgroundMusic.setVolume(0);
-              audioIcon.textContent = '🔇';
-              isMuted = true;
-            }
-          }
-        });
-        volumeSlider.addEventListener('click', (e) => e.stopPropagation());
-      }
-    }
-    
-    // ------ СЦЕНА CREATE ------
-    function create() {
-      gameSceneRef = this;
-      isDead = false; lives = 3; isPaused = false; lastDirection = 'right'; isCrouching = false;
-      enemiesStopped = false; showMenu = false; currentWeather = 'rain';
-      this.groundY = 320;
-      
-      this.bg = this.add.image(400, 200, 'bg');
-      this.bg.displayWidth = 800;
-      this.bg.displayHeight = 400;
-      
-      this.ground = this.physics.add.staticGroup();
-      const groundBlock = this.ground.create(400, this.groundY + 40).setDisplaySize(800, 40).refreshBody();
-      groundBlock.visible = false;
-      
-      player = this.physics.add.sprite(200, this.groundY, 'run1');
-      player.setScale(0.25);
-      player.setCollideWorldBounds(true);
-      this.physics.add.collider(player, this.ground);
+    if (crouchActive && !isCrouching && player.body.blocked.down) {
+      isCrouching = true;
+      player.body.setSize(55, 35, 1, 23);
+      player.setTexture('crouch').setScale(0.25);
+      player.stop();
+      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+    } else if (!crouchActive && isCrouching) {
+      isCrouching = false;
       player.body.setSize(55, 58, 1, 2);
-      
-      this.anims.create({
-        key: 'run',
-        frames: [ { key: 'run1' }, { key: 'run2' }, { key: 'run3' }, { key: 'run4' } ],
-        frameRate: 10, repeat: -1
-      });
-      this.anims.create({
-        key: 'enemyAnim',
-        frames: [ { key: 'enemy' }, { key: 'enemy2' }, { key: 'enemy3' }, { key: 'enemy2' } ],
-        frameRate: 8, repeat: -1
-      });
-      
-      this.cursors = this.input.keyboard.createCursorKeys();
-      // клавиши десктопа оставляем
-      this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu) { isPaused = !isPaused; if (isPaused) { this.physics.world.pause(); if(dustParticles) dustParticles.pause(); if(backgroundMusic && !isMuted) backgroundMusic.pause(); } else { this.physics.world.resume(); if(dustParticles) dustParticles.resume(); if(backgroundMusic && !isMuted && !isPaused) backgroundMusic.resume(); } } });
-      this.input.keyboard.on('keydown-Q', () => { if(!isDead && !isPaused && !showMenu){ enemiesStopped = !enemiesStopped; enemies.children.iterate(e=>{ if(e && e.body) e.body.setVelocityX(enemiesStopped?0:enemiesSpeed); }); } });
-      this.input.keyboard.on('keydown-ESC', () => { if(!isDead){ showMenu = !showMenu; if(showMenu){ this.physics.world.pause(); if(dustParticles) dustParticles.pause(); if(backgroundMusic && !isMuted) backgroundMusic.pause(); } else { if(!isPaused){ this.physics.world.resume(); if(dustParticles) dustParticles.resume(); if(backgroundMusic && !isMuted) backgroundMusic.resume(); } } } });
-      this.input.keyboard.on('keydown-W', () => { if(!isDead && !showMenu){ if(currentWeather === 'rain'){ currentWeather='lightning'; startLightningVisuals.call(this); } else { currentWeather='rain'; startRainVisuals.call(this); } } });
-      
-      enemies = this.physics.add.group({ allowGravity: false });
-      this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
-        if (isDead || isPaused || showMenu) return;
-        const enemyType = enemy.getData('type');
-        if (enemyType === 'low') {
-          if (player.body.blocked.down) playerHit.call(this);
-          enemy.destroy();
-        } else {
-          if (!isCrouching) playerHit.call(this);
-          enemy.destroy();
-        }
-      });
-      
-      this.time.addEvent({
-        delay: 1400, loop: true,
-        callback: () => {
-          if (isDead || isPaused || showMenu) return;
-          const enemyType = Math.random() > 0.5 ? 'low' : 'high';
-          let enemyY, enemyWidth, enemyHeight, offsetX, offsetY;
-          if (enemyType === 'low') {
-            enemyY = this.groundY + 48; enemyWidth = 320; enemyHeight = 320; offsetX = -35; offsetY = -35;
-          } else {
-            enemyY = this.groundY - 15; enemyWidth = 180; enemyHeight = 180; offsetX = -45; offsetY = -45;
-          }
-          let enemy = enemies.create(850, enemyY, 'enemy');
-          if (!enemiesStopped) enemy.setVelocityX(enemiesSpeed); else enemy.setVelocityX(0);
-          enemy.setScale(0.2);
-          enemy.body.setSize(enemyWidth, enemyHeight, offsetX, offsetY);
-          enemy.play('enemyAnim');
-          enemy.setData('type', enemyType);
-          enemy.setTint(enemyType === 'low' ? 0xff6666 : 0xaa66ff);
-        }, callbackScope: this
-      });
-      
-      updateHeartsDisplay.call(this);
-      menuText = this.add.text(400, 200, '', { fontSize: '20px', fill: '#ffffff', backgroundColor: '#000000', padding: { x: 20, y: 20 }, align: 'center' }).setOrigin(0.5).setDepth(2000).setVisible(false);
-      lightningFlash = this.add.rectangle(400, 200, 800, 400, 0xffffff, 0).setDepth(1500).setVisible(false);
-      startRainVisuals.call(this);
-      createDustParticles.call(this);
-      initAudio.call(this);
-      
-      // ================= МОБИЛЬНЫЕ СОБЫТИЯ =================
-      const btnLeft = document.getElementById('btnLeft');
-      const btnRight = document.getElementById('btnRight');
-      const btnJump = document.getElementById('btnJump');
-      const btnCrouch = document.getElementById('btnCrouch');
-      const btnPause = document.getElementById('btnPause');
-      const btnStopEnemy = document.getElementById('btnStopEnemy');
-      const btnWeather = document.getElementById('btnWeather');
-      
-      const clearTouch = (e) => { e.preventDefault(); };
-      
-      // Левый / Правый (виртуальные стики)
-      const setLeft = (pressed) => { if(pressed) externalLeft = true; else externalLeft = false; };
-      const setRight = (pressed) => { if(pressed) externalRight = true; else externalRight = false; };
-      
-      btnLeft.addEventListener('touchstart', (e) => { e.preventDefault(); setLeft(true); });
-      btnLeft.addEventListener('touchend', (e) => { e.preventDefault(); setLeft(false); });
-      btnLeft.addEventListener('mousedown', () => setLeft(true));
-      window.addEventListener('mouseup', () => setLeft(false));
-      btnRight.addEventListener('touchstart', (e) => { e.preventDefault(); setRight(true); });
-      btnRight.addEventListener('touchend', (e) => { e.preventDefault(); setRight(false); });
-      btnRight.addEventListener('mousedown', () => setRight(true));
-      window.addEventListener('mouseup', () => setRight(false));
-      
-      // прыжок (однократный)
-      btnJump.addEventListener('click', (e) => { e.preventDefault(); if (!isDead && !showMenu && player && player.body && player.body.blocked.down && !isCrouching) player.setVelocityY(-420); });
-      btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); if (!isDead && !showMenu && player && player.body && player.body.blocked.down && !isCrouching) player.setVelocityY(-420); });
-      
-      // Приседание (постоянное удержание)
-      let crouchActive = false;
-      const setCrouch = (active) => {
-        if(isDead || showMenu || isPaused) return;
-        crouchActive = active;
-        externalCrouch = active;
-      };
-      btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); setCrouch(true); });
-      btnCrouch.addEventListener('touchend', (e) => { e.preventDefault(); setCrouch(false); });
-      btnCrouch.addEventListener('mousedown', () => setCrouch(true));
-      window.addEventListener('mouseup', () => setCrouch(false));
-      
-      // Пауза
-      btnPause.addEventListener('click', (e) => { e.preventDefault(); if(!isDead && !showMenu){ isPaused = !isPaused; if(isPaused){ this.physics.world.pause(); if(dustParticles) dustParticles.pause(); if(backgroundMusic && !isMuted) backgroundMusic.pause(); } else { this.physics.world.resume(); if(dustParticles) dustParticles.resume(); if(backgroundMusic && !isMuted) backgroundMusic.resume(); } } });
-      
-      // Остановить врагов Q
-      btnStopEnemy.addEventListener('click', (e) => { e.preventDefault(); if(!isDead && !isPaused && !showMenu){ enemiesStopped = !enemiesStopped; enemies.children.iterate(e=>{ if(e && e.body) e.body.setVelocityX(enemiesStopped?0:enemiesSpeed); }); } });
-      
-      // Смена погоды W
-      btnWeather.addEventListener('click', (e) => { e.preventDefault(); if(!isDead && !showMenu){ if(currentWeather === 'rain'){ currentWeather='lightning'; startLightningVisuals.call(this); } else { currentWeather='rain'; startRainVisuals.call(this); } } });
+      player.setTexture('run1');
+      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
     }
-    
-    // ------ UPDATE ------
-    function update() {
-      if (showMenu && menuText) {
-        menuText.setVisible(true);
-        menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК (от красных)\n↓ - ПРИСЕДАНИЕ (от фиолетовых)\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - меню\n\nВРАГИ:\n🔴 КРАСНЫЕ (по земле) - ПРЫГАЙ\n🟣 ФИОЛЕТОВЫЕ (голова) - ПРИСЕДАЙ\n\nНажмите ESC для выхода');
-      } else if(menuText) menuText.setVisible(false);
-      
-      if (isDead || isPaused || showMenu) return;
-      
-      // применение внешних управлений (сенсор)
-      if (externalCrouch && !isCrouching && player.body.blocked.down) {
-        // активируем присест вручную
-        if (!isCrouching) {
-          isCrouching = true;
-          player.body.setSize(55, 35, 1, 23);
-          player.setTexture('crouch');
-          player.stop();
-          if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
-        }
-      } else if (!externalCrouch && isCrouching) {
-        isCrouching = false;
-        player.body.setSize(55, 58, 1, 2);
-        player.setTexture('run1');
-        if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
-      }
-      
-      if (!isCrouching) {
-        let moving = false;
-        player.setVelocityX(0);
-        if (externalLeft) { player.setVelocityX(-250); moving = true; lastDirection = 'left'; player.setFlipX(true); }
-        if (externalRight) { player.setVelocityX(250); moving = true; lastDirection = 'right'; player.setFlipX(false); }
-        // также обрабатываем клавиши десктопа
-        if (this.cursors.left.isDown) { player.setVelocityX(-250); moving = true; lastDirection = 'left'; player.setFlipX(true); }
-        if (this.cursors.right.isDown) { player.setVelocityX(250); moving = true; lastDirection = 'right'; player.setFlipX(false); }
-        if (this.cursors.up.isDown && player.body.blocked.down) { player.setVelocityY(-420); moving = true; }
-        
-        if (moving && player.body.blocked.down && !isCrouching) {
-          if (dustParticles) {
-            dustParticles.emitParticleAt(player.x - 15, player.y + 20);
-            dustParticles.emitParticleAt(player.x + 15, player.y + 20);
-          }
-          footprintDelay++;
-          if (footprintDelay > 15) { footprintDelay = 0; addFootprint.call(this, player.x, player.y); }
-          if (!player.anims.isPlaying) player.play('run');
-        } else {
-          if (player.anims.isPlaying) player.stop();
-          player.setTexture('run1');
-          if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
-        }
-      }
-      
-      // Погода дождь анимация
-      if (currentWeather === 'rain') {
-        for (let i = 0; i < rainDrops.length; i++) {
-          rainDrops[i].y += 8;
-          if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; }
-        }
-        for (let i = 0; i < rainStreaks.length; i++) {
-          rainStreaks[i].y += 12;
-          if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; }
-        }
-      }
-      
-      enemies.children.iterate(function (enemy) { if (enemy && enemy.x < -100) enemy.destroy(); });
+  };
+  btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); crouchActive = true; updateCrouch.call(this); });
+  btnCrouch.addEventListener('touchend', (e) => { e.preventDefault(); crouchActive = false; updateCrouch.call(this); });
+  btnCrouch.addEventListener('mousedown', () => { crouchActive = true; updateCrouch.call(this); });
+  btnCrouch.addEventListener('mouseup', () => { crouchActive = false; updateCrouch.call(this); });
+  btnCrouch.addEventListener('mouseleave', () => { if(crouchActive) { crouchActive = false; updateCrouch.call(this); } });
+
+  // Pause (кнопка)
+  btnPause.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (isDead || showMenu) return;
+    isPaused = !isPaused;
+    managePause.call(this);
+  });
+  // Stop enemies
+  btnStopEnemies.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (isDead || isPaused || showMenu) return;
+    toggleEnemiesStop.call(this);
+  });
+  // Weather
+  btnWeather.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (isDead || isPaused || showMenu) return;
+    toggleWeather.call(this);
+  });
+  // Menu
+  btnMenu.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (isDead) return;
+    toggleMenu.call(this);
+  });
+}
+
+// ========== UPDATE (игровой цикл с учетом сенсорных команд) ==========
+function update() {
+  if (showMenu) {
+    menuText.setVisible(true);
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК (от красных)\n↓ - ПРИСЕДАНИЕ (от фиол)\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nВРАГИ:\n🔴 КРАСНЫЕ (земля) - ПРЫГАЙ ↑\n🟣 ФИОЛЕТОВЫЕ (голова) - ПРИСЕДАЙ ↓\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ\nНажмите ESC для выхода');
+    return;
+  } else menuText.setVisible(false);
+
+  if (isDead || isPaused) return;
+
+  // Погода дождь
+  if (currentWeather === 'rain') {
+    for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
+    for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
+  }
+
+  const isOnGround = player.body.blocked.down;
+
+  // Приоритет: если присед от кнопки или клавиши ↓
+  const downPressed = this.cursors.down.isDown;
+  if ((downPressed || (typeof crouchActive !== 'undefined' && crouchActive)) && isOnGround) {
+    if (!isCrouching) {
+      isCrouching = true;
+      player.body.setSize(55, 35, 1, 23);
+      player.setTexture('crouch');
+      player.stop();
+      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
     }
-  })();
+  } else if (!downPressed && isCrouching && (!crouchActive || !crouchActive)) {
+    isCrouching = false;
+    player.body.setSize(55, 58, 1, 2);
+    player.setTexture('run1');
+    if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+  }
+
+  if (isCrouching) {
+    enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
+    return;
+  }
+
+  // Движение: клавиатура ИЛИ сенсорные флаги
+  let moving = false;
+  player.setVelocityX(0);
+  let leftActive = (this.cursors.left.isDown || touchLeft);
+  let rightActive = (this.cursors.right.isDown || touchRight);
+  
+  if (leftActive) {
+    player.setVelocityX(-250); moving = true; lastDirection = 'left'; player.setFlipX(true);
+  }
+  if (rightActive) {
+    player.setVelocityX(250); moving = true; lastDirection = 'right'; player.setFlipX(false);
+  }
+  
+  // Прыжок по клавише или через кнопку (обработчик уже в doJump, но также клавиатура)
+  if (this.cursors.up.isDown && player.body.blocked.down && !isCrouching) {
+    player.setVelocityY(-260);
+    moving = true;
+  }
+
+  // Анимация бега, пыль, следы
+  if (moving && isOnGround && !isCrouching) {
+    if (dustParticles) { dustParticles.emitParticleAt(player.x - 15, player.y + 20); dustParticles.emitParticleAt(player.x + 15, player.y + 20); }
+    footprintDelay++; if (footprintDelay > 15) { footprintDelay = 0; addFootprint.call(this, player.x, player.y); }
+  }
+  if (moving) { if (!player.anims.isPlaying) player.play('run'); }
+  else {
+    if (player.anims.isPlaying) player.stop();
+    player.setTexture('run1');
+    if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+  }
+
+  enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
+}
 </script>
 </body>
 </html>
