@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (FIXED CROUCH)</title>
+  <title>Runner Game — Mobile Touch Controls (CROUCH FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -129,7 +129,7 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- СЕНСОРНЫЕ КНОПКИ: приседание теперь рядом с прыжком -->
+<!-- СЕНСОРНЫЕ КНОПКИ -->
 <div class="touch-panel">
   <div class="left-group">
     <button id="btnLeft" data-action="left">◀</button>
@@ -180,9 +180,7 @@ let footprintDelay = 0;
 let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
-
-// Для приседания - отдельный флаг без сложной логики
-let touchCrouchActive = false;
+let touchCrouchActive = false;  // Флаг для сенсорной кнопки приседания
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -454,7 +452,7 @@ function initAudio() {
     if (backgroundMusic && backgroundMusic.isPlaying) return;
     if (backgroundMusic && !backgroundMusic.isPlaying) { if (!isMuted) backgroundMusic.resume(); return; }
     backgroundMusic = this.sound.add('bgMusic', { loop: true, volume: currentVolume });
-    backgroundMusic.play(); musicStarted = true;
+    backgroundMusic.play();
     setupAudioControls();
   } catch(e) { console.log("audio err", e); }
 }
@@ -482,7 +480,7 @@ function setupAudioControls() {
   }
 }
 
-// ========== МОБИЛЬНЫЕ КНОПКИ (исправленное приседание) ==========
+// ========== МОБИЛЬНЫЕ КНОПКИ ==========
 function setupMobileControls() {
   const btnLeft = document.getElementById('btnLeft');
   const btnRight = document.getElementById('btnRight');
@@ -521,10 +519,12 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // ПРИСЕДАНИЕ - простая и надежная логика без мерцания
-  const startCrouch = () => {
-    if (isDead || isPaused || showMenu) return;
-    if (player && player.body && player.body.blocked.down && !isCrouching) {
+  // ПРИСЕДАНИЕ - прямая установка флага и применение
+  btnCrouch.addEventListener('touchstart', (e) => { 
+    e.preventDefault(); 
+    touchCrouchActive = true;
+    // Мгновенно применяем приседание, если игрок на земле
+    if (player && player.body && player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
       isCrouching = true;
       player.body.setSize(55, 35, 1, 23);
       player.setTexture('crouch');
@@ -532,9 +532,12 @@ function setupMobileControls() {
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
     }
-  };
+  });
   
-  const endCrouch = () => {
+  btnCrouch.addEventListener('touchend', (e) => { 
+    e.preventDefault(); 
+    touchCrouchActive = false;
+    // Отпускаем приседание
     if (isCrouching) {
       isCrouching = false;
       player.body.setSize(55, 58, 1, 2);
@@ -542,13 +545,43 @@ function setupMobileControls() {
       if (lastDirection === 'left') player.setFlipX(true);
       else player.setFlipX(false);
     }
-  };
+  });
   
-  btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); startCrouch(); });
-  btnCrouch.addEventListener('touchend', (e) => { e.preventDefault(); endCrouch(); });
-  btnCrouch.addEventListener('mousedown', () => startCrouch());
-  btnCrouch.addEventListener('mouseup', () => endCrouch());
-  btnCrouch.addEventListener('mouseleave', () => endCrouch());
+  btnCrouch.addEventListener('mousedown', () => { 
+    touchCrouchActive = true;
+    if (player && player.body && player.body.blocked.down && !isCrouching && !isDead && !isPaused && !showMenu) {
+      isCrouching = true;
+      player.body.setSize(55, 35, 1, 23);
+      player.setTexture('crouch');
+      player.stop();
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
+    }
+  });
+  
+  btnCrouch.addEventListener('mouseup', () => { 
+    touchCrouchActive = false;
+    if (isCrouching) {
+      isCrouching = false;
+      player.body.setSize(55, 58, 1, 2);
+      player.setTexture('run1');
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
+    }
+  });
+  
+  btnCrouch.addEventListener('mouseleave', () => { 
+    if (touchCrouchActive) {
+      touchCrouchActive = false;
+      if (isCrouching) {
+        isCrouching = false;
+        player.body.setSize(55, 58, 1, 2);
+        player.setTexture('run1');
+        if (lastDirection === 'left') player.setFlipX(true);
+        else player.setFlipX(false);
+      }
+    }
+  });
 
   // Пауза
   btnPause.addEventListener('click', (e) => {
@@ -602,26 +635,19 @@ function update() {
 
   const isOnGround = player.body.blocked.down;
   
-  // ПРИСЕДАНИЕ: учитываем клавиатуру И сенсорную кнопку
+  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (стрелка вниз)
   const downKeyPressed = this.cursors.down.isDown;
-  const shouldBeCrouching = (downKeyPressed) && isOnGround;
   
-  // Если нажата клавиша вниз или активна сенсорная кнопка приседания
-  // Для сенсора используем отдельную переменную, которую обновляют события кнопки
-  // Но в update мы должны синхронизировать isCrouching с состоянием сенсора.
-  // Лучше: пусть update управляет crouching только от клавиатуры, а сенсор сам меняет isCrouching.
-  // Но чтобы не было конфликта: сенсор напрямую вызывает startCrouch/endCrouch, а клавиатура работает через update.
-  
-  // Обработка клавиатурного приседания (чтобы не сломать сенсор)
-  if (downKeyPressed && isOnGround && !isCrouching) {
+  if (downKeyPressed && isOnGround && !isCrouching && !touchCrouchActive) {
     isCrouching = true;
     player.body.setSize(55, 35, 1, 23);
     player.setTexture('crouch');
     player.stop();
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
-  } else if (!downKeyPressed && isCrouching && !touchCrouchActive) {
-    // Отпускаем приседание только если сенсорная кнопка тоже не активна
+  } 
+  else if (!downKeyPressed && isCrouching && !touchCrouchActive) {
+    // Отпускаем приседание только если сенсорная кнопка не активна
     isCrouching = false;
     player.body.setSize(55, 58, 1, 2);
     player.setTexture('run1');
@@ -629,17 +655,7 @@ function update() {
     else player.setFlipX(false);
   }
   
-  // Синхронизация с сенсорным флагом (кнопка приседания может держать isCrouching = true)
-  // Флаг touchCrouchActive обновляется в обработчиках кнопки. Если touchCrouchActive true, приседаем.
-  if (touchCrouchActive && isOnGround && !isCrouching) {
-    isCrouching = true;
-    player.body.setSize(55, 35, 1, 23);
-    player.setTexture('crouch');
-    player.stop();
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
-  }
-
+  // Если в приседе - выходим (нельзя двигаться)
   if (isCrouching) {
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
@@ -695,9 +711,6 @@ function update() {
 
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
 }
-
-// Добавим глобальную переменную для музыки
-let musicStarted = false;
 </script>
 </body>
 </html>
