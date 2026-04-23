@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (KEYBOARD CROUCH FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (NO FLICKERING)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -177,8 +177,9 @@ let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
 let touchCrouchActive = false;
-let keyboardCrouchActive = false; // отдельный флаг для клавиатуры
-let lastCrouchState = false; // для предотвращения мерцания
+
+// Для предотвращения мерцания - храним предыдущее состояние
+let wasCrouchingLastFrame = false;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -225,7 +226,7 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
-  keyboardCrouchActive = false;
+  wasCrouchingLastFrame = false;
 
   this.groundY = 320;
 
@@ -563,29 +564,6 @@ function setupMobileControls() {
   btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
-function applyCrouch() {
-  if (!player || !player.body) return;
-  if (!isCrouching && !isDead && !isPaused && !showMenu) {
-    isCrouching = true;
-    player.body.setSize(55, 35, 1, 23);
-    player.setTexture('crouch');
-    player.stop();
-    player.setVelocityX(0);
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
-  }
-}
-
-function releaseCrouch() {
-  if (isCrouching) {
-    isCrouching = false;
-    player.body.setSize(55, 58, 1, 2);
-    player.setTexture('run1');
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
-  }
-}
-
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
@@ -602,20 +580,28 @@ function update() {
 
   const isOnGround = player.body.blocked.down;
   
-  // Обработка клавиатурного приседания (отдельно от сенсора)
+  // Проверяем нужно ли присесть (сенсор ИЛИ клавиша вниз)
   const downKeyPressed = this.cursors.down.isDown;
+  const shouldCrouch = (touchCrouchActive || downKeyPressed) && isOnGround;
   
-  // Обновляем флаг клавиатуры
-  keyboardCrouchActive = downKeyPressed;
-  
-  // Проверяем нужно ли присесть (сенсор ИЛИ клавиатура)
-  const shouldBeCrouching = (touchCrouchActive || keyboardCrouchActive) && isOnGround;
-  
-  // Плавное переключение без мерцания
-  if (shouldBeCrouching && !isCrouching) {
-    applyCrouch();
-  } else if (!shouldBeCrouching && isCrouching) {
-    releaseCrouch();
+  // Плавное переключение - меняем состояние только если оно отличается от текущего
+  if (shouldCrouch && !isCrouching) {
+    // Начинаем приседание
+    isCrouching = true;
+    player.body.setSize(55, 35, 1, 23);
+    player.setTexture('crouch');
+    player.stop();
+    player.setVelocityX(0);
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
+  } 
+  else if (!shouldCrouch && isCrouching) {
+    // Выходим из приседания
+    isCrouching = false;
+    player.body.setSize(55, 58, 1, 2);
+    player.setTexture('run1');
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
   }
   
   // Если в приседе - блокируем движение
