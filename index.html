@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Золотой вихрь смерти</title>
+  <title>Runner Game — Золотой вихрь + фиксы</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -185,7 +185,8 @@ let invincibleTimer = null, isInvincible = false;
 let rainDrops = [], rainStreaks = [], lightningFlash, lightningTimer, currentWeather = 'rain';
 let dustParticles, footprints = [], footprintDelay = 0;
 let touchLeft = false, touchRight = false, jumpCooldown = false, touchCrouchActive = false;
-let deathSpiralStars = [], isRespawning = false;
+let isRespawning = false;
+let enemiesGenerationEnabled = true; // флаг для остановки генерации врагов
 
 function preload() {
   this.load.image('bg', 'bg.png');
@@ -207,6 +208,7 @@ function create() {
   isCrouching = false; enemiesStopped = false; showMenu = false; currentWeather = 'rain';
   touchLeft = false; touchRight = false; touchCrouchActive = false;
   doubleJumpActive = false; canDoubleJump = false; isInvincible = false; isRespawning = false;
+  enemiesGenerationEnabled = true;
   // Счёт НЕ СБРАСЫВАЕТСЯ — оставляем score как есть
 
   this.groundY = 320;
@@ -276,9 +278,10 @@ function create() {
     }, callbackScope: this
   });
 
-  // Спавн обычных врагов
+  // Спавн обычных врагов (с проверкой флага)
   this.time.addEvent({
     delay: 1400, loop: true, callback: () => {
+      if (!enemiesGenerationEnabled) return;
       if (isDead || isPaused || showMenu || isRespawning) return;
       const low = Math.random() > 0.5;
       let y = low ? this.groundY + 48 : this.groundY - 15;
@@ -297,6 +300,7 @@ function create() {
   // Спавн золотых/серебряных
   this.time.addEvent({
     delay: 2500, loop: true, callback: () => {
+      if (!enemiesGenerationEnabled) return;
       if (isDead || isPaused || showMenu || isRespawning) return;
       const isGold = Math.random() > 0.5;
       const isLow = Math.random() > 0.5;
@@ -377,10 +381,9 @@ function deathVortexEffect(respawnX, respawnY, onComplete) {
   let centerX = player.x, centerY = player.y;
   let starCount = 500;
   
-  // Создаём звёзды, расположенные по спирали
   for (let i = 0; i < starCount; i++) {
-    let t = i / starCount; // 0..1
-    let angle = t * Math.PI * 8; // 4 оборота спирали
+    let t = i / starCount;
+    let angle = t * Math.PI * 8;
     let radius = 20 + t * 180;
     let x = centerX + Math.cos(angle) * radius;
     let y = centerY + Math.sin(angle) * radius - 20;
@@ -392,11 +395,9 @@ function deathVortexEffect(respawnX, respawnY, onComplete) {
     stars.push(star);
   }
   
-  // Анимация раскручивания спирали наружу
   let duration = 800;
   stars.forEach((star, idx) => {
     let startRadius = star.getData('radius');
-    let targetRadius = startRadius + 150;
     this.tweens.add({
       targets: star,
       scale: { from: 1, to: 0.6 },
@@ -413,7 +414,6 @@ function deathVortexEffect(respawnX, respawnY, onComplete) {
     });
   });
   
-  // Затем собираем звёзды в точку респавна
   this.time.delayedCall(duration + 100, () => {
     stars.forEach(star => {
       this.tweens.add({
@@ -428,7 +428,6 @@ function deathVortexEffect(respawnX, respawnY, onComplete) {
       });
     });
     
-    // Эффект вспышки в точке сбора
     let glow = this.add.circle(respawnX, respawnY, 10, 0xffaa44, 0.9);
     this.tweens.add({
       targets: glow,
@@ -578,6 +577,12 @@ function playerHit() {
   if (lives <= 0) {
     isDead = true; isRespawning = true;
     player.stop(); player.setVisible(false); player.body.enable = false;
+    // Останавливаем генерацию врагов
+    enemiesGenerationEnabled = false;
+    // Очищаем всех существующих врагов
+    enemies.children.iterate(e => { if (e) e.destroy(); });
+    specialEnemies.children.iterate(m => { if (m) m.destroy(); });
+    
     let respawnX = 200, respawnY = this.groundY;
     
     deathVortexEffect.call(this, respawnX, respawnY, () => {
@@ -590,9 +595,8 @@ function playerHit() {
       isInvincible = true; player.setTint(0xff8888);
       if (invincibleTimer) invincibleTimer.remove();
       invincibleTimer = this.time.delayedCall(1500, () => { isInvincible = false; player.clearTint(); }, [], this);
-      // Очищаем врагов
-      enemies.children.iterate(e => { if (e) e.destroy(); });
-      specialEnemies.children.iterate(m => { if (m) m.destroy(); });
+      // Включаем генерацию врагов заново
+      enemiesGenerationEnabled = true;
       // Эффект появления
       let appear = this.add.circle(respawnX, respawnY, 20, 0xffaa44, 0.6);
       this.tweens.add({ targets: appear, scale: 3, alpha: 0, duration: 500, onComplete: () => appear.destroy() });
@@ -679,7 +683,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни (не сбрасываются)\n👟 Кроссовок - двойной прыжок 15 сек!\n🌀 СМЕРТЬ: ЗОЛОТОЙ ВИХРЬ из 500 звёзд!\n📱 Вибрация + звёздочки + тряска\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко (НЕ СБРАСЫВАЕТСЯ)\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n🌀 СМЕРТЬ: ЗОЛОТОЙ ВИХРЬ из 500 звёзд!\n📱 Вибрация + звёздочки + тряска\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
     return;
   } else menuText.setVisible(false);
   if (isDead || isPaused || isRespawning) return;
@@ -689,8 +693,12 @@ function update() {
   }
   updateBonusTimer.call(this);
   if (player.body.blocked.down) canDoubleJump = doubleJumpActive;
-  enemies.children.iterate(e => { if (e && e.x < -100 && !e.getData('scored')) { e.setData('scored', true); score++; updateScoreDisplay.call(this); } if (e && e.x > 900) e.destroy(); });
-  specialEnemies.children.iterate(m => { if (m && m.x > 900 && !m.getData('scored')) { m.setData('scored', true); score++; updateScoreDisplay.call(this); } if (m && m.x < -100) m.destroy(); });
+  enemies.children.iterate(e => { if (e && e.x < -100 && !e.getData('scored')) { e.setData('scored', true); score++; updateScoreDisplay.call(this); } });
+  specialEnemies.children.iterate(m => { if (m && m.x > 900 && !m.getData('scored')) { m.setData('scored', true); score++; updateScoreDisplay.call(this); } });
+  // Удаление врагов за экраном
+  enemies.children.iterate(e => { if (e && e.x > 900) e.destroy(); });
+  specialEnemies.children.iterate(m => { if (m && m.x < -100) m.destroy(); });
+  
   let onGround = player.body.blocked.down;
   let wantCrouch = touchCrouchActive || this.cursors.down.isDown;
   if (wantCrouch && onGround && !isCrouching) {
