@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Двойной прыжок (исправлен)</title>
+  <title>Runner Game — Бонус: Кроссовк (эффекты)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -171,9 +171,12 @@ let scoreFrame;
 
 let doubleJumpActive = false;
 let doubleJumpTimer = null;
-let playerGlow = null;
 let bonusSpawnTimer = null;
-let canDoubleJump = false; // флаг для возможности двойного прыжка
+let canDoubleJump = false;
+
+// Эффекты
+let bonusEffectTimer = null;
+let speedLines = [];
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -239,6 +242,7 @@ function create() {
   touchCrouchActive = false;
   doubleJumpActive = false;
   canDoubleJump = false;
+  speedLines = [];
 
   this.groundY = 320;
 
@@ -317,7 +321,7 @@ function create() {
     monster.destroy();
   });
 
-  // Генерация бонусов (без рамки подсветки)
+  // Генерация бонусов
   bonusSpawnTimer = this.time.addEvent({
     delay: 8000,
     loop: true,
@@ -423,32 +427,63 @@ function create() {
   setupMobileControls.call(this);
 }
 
+function createSpeedLines() {
+  if (!doubleJumpActive) return;
+  for (let i = 0; i < 8; i++) {
+    const line = this.add.rectangle(Math.random() * 800, Math.random() * 400, 2, Math.random() * 30 + 10, 0xffaa44, 0.6);
+    line.setDepth(400);
+    speedLines.push(line);
+    this.tweens.add({
+      targets: line,
+      x: line.x - 400,
+      alpha: 0,
+      duration: 800,
+      onComplete: () => {
+        line.destroy();
+        const index = speedLines.indexOf(line);
+        if (index > -1) speedLines.splice(index, 1);
+      }
+    });
+  }
+}
+
 function activateDoubleJumpBonus() {
   if (doubleJumpActive) return;
   doubleJumpActive = true;
-  canDoubleJump = false;
+  canDoubleJump = true;
   
-  playerGlow = this.add.rectangle(player.x, player.y, 85, 85, 0xffaa44, 0.3);
-  playerGlow.setStrokeStyle(4, 0xffdd88, 0.9);
-  playerGlow.setDepth(500);
-  
+  // Эффект активации бонуса
+  const activationEffect = this.add.circle(player.x, player.y, 30, 0xffaa44, 0.7);
   this.tweens.add({
-    targets: playerGlow,
-    alpha: { from: 0.3, to: 0.6 },
-    scale: { from: 1, to: 1.05 },
-    duration: 400,
-    yoyo: true,
-    repeat: -1
+    targets: activationEffect,
+    scale: { from: 0.5, to: 2 },
+    alpha: { from: 0.7, to: 0 },
+    duration: 500,
+    onComplete: () => activationEffect.destroy()
   });
+  
+  // Эффект искр вокруг персонажа
+  const sparkEffect = this.add.particles(player.x, player.y, null, {
+    speed: { min: 100, max: 250 },
+    angle: { min: 0, max: 360 },
+    scale: { start: 0.2, end: 0 },
+    alpha: { start: 0.8, end: 0 },
+    lifespan: 500,
+    quantity: 20,
+    tint: 0xffaa44
+  });
+  const sparkGraphics = this.add.graphics();
+  sparkGraphics.fillStyle(0xffaa44, 1);
+  sparkGraphics.fillCircle(4, 4, 4);
+  sparkGraphics.generateTexture('spark', 8, 8);
+  sparkGraphics.clear();
+  sparkEffect.setTexture('spark');
+  this.time.delayedCall(300, () => sparkEffect.destroy());
   
   if (doubleJumpTimer) doubleJumpTimer.remove();
   doubleJumpTimer = this.time.delayedCall(15000, () => {
     doubleJumpActive = false;
     canDoubleJump = false;
-    if (playerGlow) {
-      playerGlow.destroy();
-      playerGlow = null;
-    }
     this.cameras.main.flash(300, 255, 200, 0);
   }, [], this);
   
@@ -571,9 +606,6 @@ function playerHit() {
   updateHeartsDisplay.call(this);
   this.cameras.main.flash(500, 255, 0, 0);
   
-  // При получении урона НЕ сбрасываем бонус, а только снимаем одну жизнь
-  // Бонус остаётся активным
-  
   if (lives <= 0) {
     isDead = true;
     player.stop();
@@ -592,7 +624,6 @@ function playerHit() {
     player.setVelocityY(-200);
     enemies.children.iterate(enemy => { if (enemy) enemy.destroy(); });
     specialEnemies.children.iterate(monster => { if (monster) monster.destroy(); });
-    // Бонусы НЕ удаляем при получении урона
     this.time.delayedCall(1000, () => {
       isDead = false;
       player.clearTint();
@@ -685,15 +716,19 @@ function setupMobileControls() {
       jumpCooldown = true;
       canDoubleJump = false;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
-      const jumpEffect = this.add.text(player.x, player.y - 20, '✧', { fontSize: '24px', fill: '#ffaa44' });
-      jumpEffect.setOrigin(0.5);
-      this.tweens.add({
-        targets: jumpEffect,
-        y: jumpEffect.y - 40,
-        alpha: 0,
-        duration: 400,
-        onComplete: () => jumpEffect.destroy()
-      });
+      
+      // Эффект двойного прыжка
+      for (let i = 0; i < 8; i++) {
+        const trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7);
+        this.tweens.add({
+          targets: trail,
+          y: trail.y - 30,
+          alpha: 0,
+          scale: { from: 1, to: 0 },
+          duration: 400,
+          onComplete: () => trail.destroy()
+        });
+      }
     }
   };
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
@@ -732,8 +767,18 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
-  if (playerGlow && player) {
-    playerGlow.setPosition(player.x, player.y);
+  // Эффект скорости при активном бонусе и беге
+  if (doubleJumpActive && (this.cursors.left.isDown || this.cursors.right.isDown || touchLeft || touchRight) && player.body.blocked.down) {
+    if (Math.random() < 0.1) {
+      const spark = this.add.circle(player.x + (lastDirection === 'right' ? -15 : 15), player.y + 15, 2, 0xffaa44, 0.8);
+      this.tweens.add({
+        targets: spark,
+        alpha: 0,
+        scale: { from: 1, to: 0.5 },
+        duration: 300,
+        onComplete: () => spark.destroy()
+      });
+    }
   }
 
   // Сброс canDoubleJump при касании земли
@@ -808,7 +853,7 @@ function update() {
       player.setVelocityY(-260);
       jumpCooldown = true;
       moving = true;
-      canDoubleJump = true;
+      canDoubleJump = doubleJumpActive;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
     } else if (doubleJumpActive && canDoubleJump && !isOnGround && !isCrouching) {
       player.setVelocityY(-260);
@@ -816,15 +861,19 @@ function update() {
       moving = true;
       canDoubleJump = false;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
-      const jumpEffect = this.add.text(player.x, player.y - 20, '✧', { fontSize: '24px', fill: '#ffaa44' });
-      jumpEffect.setOrigin(0.5);
-      this.tweens.add({
-        targets: jumpEffect,
-        y: jumpEffect.y - 40,
-        alpha: 0,
-        duration: 400,
-        onComplete: () => jumpEffect.destroy()
-      });
+      
+      // Эффект двойного прыжка
+      for (let i = 0; i < 8; i++) {
+        const trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7);
+        this.tweens.add({
+          targets: trail,
+          y: trail.y - 30,
+          alpha: 0,
+          scale: { from: 1, to: 0 },
+          duration: 400,
+          onComplete: () => trail.destroy()
+        });
+      }
     }
   }
 
