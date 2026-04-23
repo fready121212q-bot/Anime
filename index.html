@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls</title>
+  <title>Runner Game — Mobile Touch Controls (FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -75,7 +75,7 @@
       padding: 0 16px 20px 16px;
       gap: 15px;
       z-index: 1800;
-      pointer-events: none; /* чтобы клики проходили сквозь фон */
+      pointer-events: none;
     }
     .touch-panel button {
       pointer-events: auto;
@@ -98,7 +98,6 @@
       justify-content: center;
       font-family: monospace;
     }
-    /* Группа левых кнопок */
     .left-group {
       display: flex;
       gap: 16px;
@@ -115,7 +114,6 @@
       border-radius: 100px;
       backdrop-filter: blur(4px);
     }
-    /* Спец кнопки по центру внизу? но оставим удобно */
     .center-group {
       display: flex;
       gap: 15px;
@@ -129,7 +127,6 @@
       background: rgba(100, 150, 220, 0.9);
       border-color: #ffcc88;
     }
-    /* подпись для мобильных (маленькая) */
     .btn-label {
       font-size: 12px;
       position: absolute;
@@ -153,12 +150,6 @@
       .touch-panel button { width: 54px; height: 54px; font-size: 22px; }
       .left-group, .right-group { gap: 10px; padding: 5px 10px; }
     }
-    /* для десктопа кнопки тоже полезны (можно скрыть, но пусть будут, не мешают) */
-    @media (min-width: 1024px) {
-      .touch-panel {
-        opacity: 0.85;
-      }
-    }
   </style>
 </head>
 <body>
@@ -179,7 +170,7 @@
     <button id="btnCrouch" data-action="crouch">▼<span class="btn-label" style="bottom:-20px;">присед</span></button>
     <button id="btnPause" data-action="pause">⏸️</button>
     <button id="btnStopEnemies" data-action="stopEnemies">⏹️<span class="btn-label" style="bottom:-20px;">стоп враг</span></button>
-    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label" style="bottom:-20px;">погода(W)</span></button>
+    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label" style="bottom:-20px;">погода</span></button>
   </div>
   <div class="right-group">
     <button id="btnMenu" data-action="menu">📜<span class="btn-label">меню</span></button>
@@ -216,13 +207,10 @@ let dustParticles;
 let footprints = [];
 let footprintDelay = 0;
 
-// Для обработки мобильных кнопок (эмуляция клавиш)
+// Для обработки мобильных кнопок
 let touchLeft = false;
 let touchRight = false;
-let touchJumpQueued = false;
-let touchCrouchQueued = false;
-
-// Флаг, чтобы не спамить прыжок каждый кадр
+let touchCrouchPressed = false;   // зажата ли кнопка приседа
 let jumpCooldown = false;
 
 const game = new Phaser.Game({
@@ -269,8 +257,7 @@ function create() {
   currentWeather = 'rain';
   touchLeft = false;
   touchRight = false;
-  touchJumpQueued = false;
-  touchCrouchQueued = false;
+  touchCrouchPressed = false;
 
   this.groundY = 320;
 
@@ -303,7 +290,7 @@ function create() {
 
   this.cursors = this.input.keyboard.createCursorKeys();
 
-  // ---- КЛАВИАТУРНЫЕ КОМАНДЫ (оставляем) ----
+  // ---- КЛАВИАТУРНЫЕ КОМАНДЫ ----
   this.input.keyboard.on('keydown-SPACE', () => { if (!isDead && !showMenu) { isPaused = !isPaused; managePause.call(this); } });
   this.input.keyboard.on('keydown-Q', () => { if (!isDead && !isPaused && !showMenu) toggleEnemiesStop.call(this); });
   this.input.keyboard.on('keydown-ESC', () => { if (!isDead) toggleMenu.call(this); });
@@ -364,11 +351,11 @@ function create() {
   createDustParticles.call(this);
   initAudio.call(this);
 
-  // ---------- МОБИЛЬНЫЕ КНОПКИ: обработка событий ----------
+  // ---------- МОБИЛЬНЫЕ КНОПКИ ----------
   setupMobileControls.call(this);
 }
 
-// ========== ФУНКЦИИ УПРАВЛЕНИЯ СОСТОЯНИЕМ ==========
+// ========== ФУНКЦИИ УПРАВЛЕНИЯ ==========
 function managePause() {
   if (isPaused) {
     this.physics.world.pause();
@@ -526,7 +513,7 @@ function setupAudioControls() {
   }
 }
 
-// ========== МОБИЛЬНЫЕ КНОПКИ: подключение ==========
+// ========== МОБИЛЬНЫЕ КНОПКИ (исправленная версия) ==========
 function setupMobileControls() {
   const btnLeft = document.getElementById('btnLeft');
   const btnRight = document.getElementById('btnRight');
@@ -537,7 +524,7 @@ function setupMobileControls() {
   const btnWeather = document.getElementById('btnWeather');
   const btnMenu = document.getElementById('btnMenu');
 
-  // Left / Right (зажатие)
+  // Left / Right
   const setTouchLeft = (state) => { if (!isDead && !showMenu && !isPaused) touchLeft = state; };
   const setTouchRight = (state) => { if (!isDead && !showMenu && !isPaused) touchRight = state; };
   
@@ -553,10 +540,10 @@ function setupMobileControls() {
   btnRight.addEventListener('mouseup', () => setTouchRight(false));
   btnRight.addEventListener('mouseleave', () => setTouchRight(false));
 
-  // Jump (однократно)
+  // Jump
   const doJump = () => {
     if (isDead || isPaused || showMenu) return;
-    if (player.body.blocked.down && !jumpCooldown && !isCrouching) {
+    if (player && player.body && player.body.blocked.down && !jumpCooldown && !isCrouching) {
       player.setVelocityY(-260);
       jumpCooldown = true;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
@@ -565,60 +552,100 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // Crouch (зажатие/отжатие)
-  let crouchActive = false;
-  const updateCrouch = () => {
+  // Crouch — корректная работа без зависаний
+  const updateCrouchFromTouch = () => {
     if (isDead || isPaused || showMenu) {
-      if (crouchActive) { crouchActive = false; isCrouching = false; if(player.body) player.body.setSize(55, 58, 1, 2); player.setTexture('run1'); }
+      if (isCrouching) {
+        isCrouching = false;
+        if (player && player.body) {
+          player.body.setSize(55, 58, 1, 2);
+          player.setTexture('run1');
+          if (lastDirection === 'left') player.setFlipX(true);
+          else player.setFlipX(false);
+        }
+      }
       return;
     }
-    if (crouchActive && !isCrouching && player.body.blocked.down) {
+    
+    const isOnGround = player && player.body && player.body.blocked.down;
+    if (touchCrouchPressed && isOnGround && !isCrouching) {
       isCrouching = true;
       player.body.setSize(55, 35, 1, 23);
-      player.setTexture('crouch').setScale(0.25);
+      player.setTexture('crouch');
+      player.setScale(0.25);
       player.stop();
-      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
-    } else if (!crouchActive && isCrouching) {
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
+    } 
+    else if (!touchCrouchPressed && isCrouching) {
       isCrouching = false;
       player.body.setSize(55, 58, 1, 2);
       player.setTexture('run1');
-      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
     }
   };
-  btnCrouch.addEventListener('touchstart', (e) => { e.preventDefault(); crouchActive = true; updateCrouch.call(this); });
-  btnCrouch.addEventListener('touchend', (e) => { e.preventDefault(); crouchActive = false; updateCrouch.call(this); });
-  btnCrouch.addEventListener('mousedown', () => { crouchActive = true; updateCrouch.call(this); });
-  btnCrouch.addEventListener('mouseup', () => { crouchActive = false; updateCrouch.call(this); });
-  btnCrouch.addEventListener('mouseleave', () => { if(crouchActive) { crouchActive = false; updateCrouch.call(this); } });
+  
+  btnCrouch.addEventListener('touchstart', (e) => { 
+    e.preventDefault(); 
+    touchCrouchPressed = true; 
+    updateCrouchFromTouch.call(this); 
+  });
+  btnCrouch.addEventListener('touchend', (e) => { 
+    e.preventDefault(); 
+    touchCrouchPressed = false; 
+    updateCrouchFromTouch.call(this); 
+  });
+  btnCrouch.addEventListener('mousedown', () => { 
+    touchCrouchPressed = true; 
+    updateCrouchFromTouch.call(this); 
+  });
+  btnCrouch.addEventListener('mouseup', () => { 
+    touchCrouchPressed = false; 
+    updateCrouchFromTouch.call(this); 
+  });
+  btnCrouch.addEventListener('mouseleave', () => { 
+    if (touchCrouchPressed) {
+      touchCrouchPressed = false; 
+      updateCrouchFromTouch.call(this);
+    }
+  });
 
-  // Pause (кнопка)
+  // Pause
   btnPause.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || showMenu) return;
     isPaused = !isPaused;
     managePause.call(this);
   });
+  btnPause.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || showMenu) return; isPaused = !isPaused; managePause.call(this); });
+  
   // Stop enemies
   btnStopEnemies.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
     toggleEnemiesStop.call(this);
   });
+  btnStopEnemies.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleEnemiesStop.call(this); });
+  
   // Weather
   btnWeather.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead || isPaused || showMenu) return;
     toggleWeather.call(this);
   });
+  btnWeather.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead || isPaused || showMenu) return; toggleWeather.call(this); });
+  
   // Menu
   btnMenu.addEventListener('click', (e) => {
     e.preventDefault();
     if (isDead) return;
     toggleMenu.call(this);
   });
+  btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
-// ========== UPDATE (игровой цикл с учетом сенсорных команд) ==========
+// ========== UPDATE ==========
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
@@ -628,67 +655,90 @@ function update() {
 
   if (isDead || isPaused) return;
 
-  // Погода дождь
+  // Дождь
   if (currentWeather === 'rain') {
     for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
   const isOnGround = player.body.blocked.down;
-
-  // Приоритет: если присед от кнопки или клавиши ↓
-  const downPressed = this.cursors.down.isDown;
-  if ((downPressed || (typeof crouchActive !== 'undefined' && crouchActive)) && isOnGround) {
-    if (!isCrouching) {
-      isCrouching = true;
-      player.body.setSize(55, 35, 1, 23);
-      player.setTexture('crouch');
-      player.stop();
-      if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
-    }
-  } else if (!downPressed && isCrouching && (!crouchActive || !crouchActive)) {
+  
+  // Обработка приседания: клавиатура ИЛИ сенсор
+  const downKeyPressed = this.cursors.down.isDown;
+  const shouldCrouch = (downKeyPressed || touchCrouchPressed) && isOnGround;
+  
+  if (shouldCrouch && !isCrouching) {
+    isCrouching = true;
+    player.body.setSize(55, 35, 1, 23);
+    player.setTexture('crouch');
+    player.stop();
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
+  } 
+  else if (!shouldCrouch && isCrouching) {
     isCrouching = false;
     player.body.setSize(55, 58, 1, 2);
     player.setTexture('run1');
-    if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
   }
 
+  // Если в приседе — останавливаем обработку движения
   if (isCrouching) {
+    // Удаляем улетевших врагов
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
   }
 
-  // Движение: клавиатура ИЛИ сенсорные флаги
+  // Движение
   let moving = false;
   player.setVelocityX(0);
-  let leftActive = (this.cursors.left.isDown || touchLeft);
-  let rightActive = (this.cursors.right.isDown || touchRight);
+  
+  const leftActive = (this.cursors.left.isDown || touchLeft);
+  const rightActive = (this.cursors.right.isDown || touchRight);
   
   if (leftActive) {
-    player.setVelocityX(-250); moving = true; lastDirection = 'left'; player.setFlipX(true);
+    player.setVelocityX(-250);
+    moving = true;
+    lastDirection = 'left';
+    player.setFlipX(true);
   }
   if (rightActive) {
-    player.setVelocityX(250); moving = true; lastDirection = 'right'; player.setFlipX(false);
+    player.setVelocityX(250);
+    moving = true;
+    lastDirection = 'right';
+    player.setFlipX(false);
   }
   
-  // Прыжок по клавише или через кнопку (обработчик уже в doJump, но также клавиатура)
-  if (this.cursors.up.isDown && player.body.blocked.down && !isCrouching) {
+  // Прыжок с клавиатуры
+  if (this.cursors.up.isDown && isOnGround && !isCrouching) {
     player.setVelocityY(-260);
     moving = true;
   }
 
-  // Анимация бега, пыль, следы
+  // Анимация и эффекты
   if (moving && isOnGround && !isCrouching) {
-    if (dustParticles) { dustParticles.emitParticleAt(player.x - 15, player.y + 20); dustParticles.emitParticleAt(player.x + 15, player.y + 20); }
-    footprintDelay++; if (footprintDelay > 15) { footprintDelay = 0; addFootprint.call(this, player.x, player.y); }
+    if (dustParticles) {
+      dustParticles.emitParticleAt(player.x - 15, player.y + 20);
+      dustParticles.emitParticleAt(player.x + 15, player.y + 20);
+    }
+    footprintDelay++;
+    if (footprintDelay > 15) {
+      footprintDelay = 0;
+      addFootprint.call(this, player.x, player.y);
+    }
   }
-  if (moving) { if (!player.anims.isPlaying) player.play('run'); }
-  else {
+  
+  if (moving) {
+    if (!player.anims.isPlaying) player.play('run');
+  } else {
     if (player.anims.isPlaying) player.stop();
     player.setTexture('run1');
-    if (lastDirection === 'left') player.setFlipX(true); else player.setFlipX(false);
+    if (lastDirection === 'left') player.setFlipX(true);
+    else player.setFlipX(false);
   }
 
+  // Очистка врагов за экраном
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
 }
 </script>
