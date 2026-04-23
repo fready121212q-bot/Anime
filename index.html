@@ -94,16 +94,17 @@
       justify-content: center;
       font-size: 30px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: none; /* Убираем анимацию при нажатии */
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
+      -webkit-tap-highlight-color: transparent; /* Убираем подсветку на iOS */
     }
     
     .control-btn:active {
-      transform: scale(0.95);
-      background: rgba(255,255,255,0.4);
+      transform: none; /* Убираем трансформацию при нажатии */
+      background: rgba(255,255,255,0.2); /* Оставляем тот же фон */
     }
     
     .action-buttons {
@@ -122,16 +123,17 @@
       justify-content: center;
       font-size: 28px;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: none; /* Убираем анимацию при нажатии */
       user-select: none;
       touch-action: manipulation;
       color: white;
       font-weight: bold;
+      -webkit-tap-highlight-color: transparent; /* Убираем подсветку на iOS */
     }
     
     .action-btn:active {
-      transform: scale(0.95);
-      background: rgba(255,255,255,0.3);
+      transform: none; /* Убираем трансформацию при нажатии */
+      background: rgba(0,0,0,0.7); /* Оставляем тот же фон */
     }
     
     .jump-btn {
@@ -144,7 +146,7 @@
       border-color: #FF9800;
     }
     
-    /* Кнопка паузы - перемещена в левый верхний угол */
+    /* Кнопка паузы */
     .pause-btn {
       position: fixed;
       top: 20px;
@@ -163,11 +165,12 @@
       pointer-events: auto;
       color: white;
       backdrop-filter: blur(5px);
+      transition: none;
+      -webkit-tap-highlight-color: transparent;
     }
     
     .pause-btn:active {
-      transform: scale(0.95);
-      background: rgba(255,255,255,0.3);
+      transform: none;
     }
     
     .swipe-indicator {
@@ -625,21 +628,18 @@ function setupMobileControls() {
   const swipeIndicator = document.getElementById('swipeIndicator');
   const musicLaunchBtn = document.getElementById('musicLaunchBtn');
   
-  // Обработка касаний для кнопок движения
+  // Обработка касаний для кнопок движения (без визуальных эффектов)
   if (moveLeftBtn) {
     moveLeftBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       moveLeftActive = true;
-      moveLeftBtn.style.transform = 'scale(0.95)';
     });
     moveLeftBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
       moveLeftActive = false;
-      moveLeftBtn.style.transform = 'scale(1)';
     });
     moveLeftBtn.addEventListener('touchcancel', (e) => {
       moveLeftActive = false;
-      moveLeftBtn.style.transform = 'scale(1)';
     });
   }
   
@@ -647,16 +647,13 @@ function setupMobileControls() {
     moveRightBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       moveRightActive = true;
-      moveRightBtn.style.transform = 'scale(0.95)';
     });
     moveRightBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
       moveRightActive = false;
-      moveRightBtn.style.transform = 'scale(1)';
     });
     moveRightBtn.addEventListener('touchcancel', (e) => {
       moveRightActive = false;
-      moveRightBtn.style.transform = 'scale(1)';
     });
   }
   
@@ -664,12 +661,14 @@ function setupMobileControls() {
     jumpBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       jumpActive = true;
-      jumpBtn.style.transform = 'scale(0.95)';
-      setTimeout(() => { jumpActive = false; }, 100);
+      // Сбрасываем через короткое время, чтобы прыжок произошел только один раз
+      setTimeout(() => { 
+        jumpActive = false; 
+      }, 200);
     });
     jumpBtn.addEventListener('touchend', (e) => {
-      jumpActive = false;
-      jumpBtn.style.transform = 'scale(1)';
+      e.preventDefault();
+      // Не сбрасываем сразу, чтобы прыжок точно произошел
     });
   }
   
@@ -677,21 +676,19 @@ function setupMobileControls() {
     crouchBtn.addEventListener('touchstart', (e) => {
       e.preventDefault();
       crouchActive = true;
-      crouchBtn.style.transform = 'scale(0.95)';
     });
     crouchBtn.addEventListener('touchend', (e) => {
       e.preventDefault();
       crouchActive = false;
-      crouchBtn.style.transform = 'scale(1)';
     });
     crouchBtn.addEventListener('touchcancel', (e) => {
       crouchActive = false;
-      crouchBtn.style.transform = 'scale(1)';
     });
   }
   
   if (pauseBtn) {
-    pauseBtn.addEventListener('click', () => {
+    pauseBtn.addEventListener('click', (e) => {
+      e.preventDefault();
       if (!isDead && !showMenu && gameScene) {
         isPaused = !isPaused;
         if (isPaused) {
@@ -743,12 +740,12 @@ function setupMobileControls() {
       if (deltaY < 0) {
         // Свайп вверх - прыжок
         jumpActive = true;
-        setTimeout(() => { jumpActive = false; }, 100);
+        setTimeout(() => { jumpActive = false; }, 200);
         showSwipeIndicator('⬆️');
       } else if (deltaY > 0) {
         // Свайп вниз - приседание
         crouchActive = true;
-        setTimeout(() => { crouchActive = false; }, 200);
+        setTimeout(() => { crouchActive = false; }, 300);
         showSwipeIndicator('⬇️');
       }
     }
