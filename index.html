@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Исправленное получение урона</title>
+  <title>Runner Game — Финальная версия</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -16,39 +16,27 @@
       background: #0a0f1e;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
-    .audio-control {
-      position: fixed;
-      top: 12px;
-      right: 12px;
-      z-index: 2000;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(8px);
-      border-radius: 40px;
-      padding: 6px 14px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border: 1px solid rgba(255,255,255,0.3);
-      cursor: pointer;
-    }
-    .audio-icon { font-size: 22px; color: white; }
-    .volume-slider { width: 70px; height: 4px; -webkit-appearance: none; background: #555; border-radius: 4px; }
-    .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer; }
-    .volume-value { color: white; font-size: 11px; min-width: 32px; }
 
-    .top-buttons {
+    /* Верхняя панель с кнопками и регулятором громкости */
+    .top-panel {
       position: fixed;
       top: 12px;
       left: 0;
       right: 0;
       display: flex;
-      justify-content: center;
-      gap: 12px;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
       z-index: 2000;
       pointer-events: none;
     }
-    .top-buttons button {
+    .top-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
       pointer-events: auto;
+    }
+    .top-buttons button {
       background: rgba(0,0,0,0.75);
       backdrop-filter: blur(8px);
       border: 1px solid rgba(255,255,255,0.4);
@@ -69,31 +57,92 @@
       background: rgba(100, 150, 220, 0.9);
     }
 
+    /* Регулятор громкости под кнопками */
+    .volume-control {
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(8px);
+      border-radius: 40px;
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid rgba(255,255,255,0.3);
+      pointer-events: auto;
+    }
+    .volume-icon {
+      font-size: 20px;
+      color: white;
+    }
+    .volume-slider {
+      width: 120px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #555;
+      border-radius: 4px;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: white;
+      cursor: pointer;
+    }
+    .volume-value {
+      color: white;
+      font-size: 12px;
+      min-width: 35px;
+      text-align: center;
+    }
+
+    /* Нижние кнопки: движение и прыжок/присед с отступами */
     .touch-panel {
       position: fixed;
-      bottom: 20px;
+      bottom: 25px;
       left: 0;
       right: 0;
       display: flex;
       justify-content: space-between;
-      align-items: flex-end;
-      padding: 0 16px 20px 16px;
-      gap: 15px;
+      align-items: center;
+      padding: 0 20px;
       z-index: 1800;
       pointer-events: none;
     }
-    .touch-panel button {
+
+    /* Левая группа (движение) */
+    .move-group {
+      display: flex;
+      gap: 40px;
+      background: rgba(0,0,0,0.3);
+      padding: 12px 25px;
+      border-radius: 100px;
+      backdrop-filter: blur(4px);
       pointer-events: auto;
+    }
+
+    /* Правая группа (прыжок и присед) — отступ 3 см (примерно 80px на мобильном) */
+    .action-group {
+      display: flex;
+      gap: 40px;
+      background: rgba(0,0,0,0.3);
+      padding: 12px 25px;
+      border-radius: 100px;
+      backdrop-filter: blur(4px);
+      pointer-events: auto;
+      margin-left: 80px;
+    }
+
+    .touch-panel button {
       background: rgba(20, 25, 45, 0.9);
       backdrop-filter: blur(12px);
       border: 1px solid rgba(255,255,255,0.4);
       border-radius: 60px;
       color: white;
-      font-size: 28px;
+      font-size: 32px;
       font-weight: bold;
       text-shadow: 0 2px 3px black;
-      width: 70px;
-      height: 70px;
+      width: 75px;
+      height: 75px;
       box-shadow: 0 6px 12px rgba(0,0,0,0.4);
       transition: 0.05s linear;
       touch-action: manipulation;
@@ -103,61 +152,68 @@
       justify-content: center;
       font-family: monospace;
     }
-    button:active {
+    .touch-panel button:active {
       transform: scale(0.92);
       background: rgba(100, 150, 220, 0.9);
       border-color: #ffcc88;
     }
-    .left-group {
-      display: flex;
-      gap: 16px;
-      background: rgba(0,0,0,0.35);
-      padding: 10px 18px;
-      border-radius: 100px;
-      backdrop-filter: blur(4px);
-    }
+
     .btn-label {
       font-size: 10px;
       position: absolute;
-      bottom: -18px;
+      bottom: -20px;
       color: #ddd;
       background: rgba(0,0,0,0.6);
       padding: 2px 6px;
       border-radius: 20px;
       white-space: nowrap;
     }
-    .touch-panel button { position: relative; }
+    .touch-panel button {
+      position: relative;
+    }
+
     @media (max-width: 700px) {
-      .touch-panel button { width: 60px; height: 60px; font-size: 24px; }
-      .btn-label { font-size: 9px; bottom: -16px; }
-      .left-group { padding: 6px 12px; gap: 12px; }
+      .touch-panel button { width: 65px; height: 65px; font-size: 28px; }
+      .btn-label { font-size: 9px; bottom: -18px; }
+      .move-group { gap: 30px; padding: 10px 20px; }
+      .action-group { gap: 30px; padding: 10px 20px; margin-left: 50px; }
       .top-buttons button { font-size: 14px; padding: 6px 12px; min-width: 55px; }
+      .volume-slider { width: 90px; }
     }
     @media (max-width: 550px) {
-      .touch-panel button { width: 54px; height: 54px; font-size: 22px; }
-      .left-group { gap: 10px; padding: 5px 10px; }
-      .top-buttons button { font-size: 12px; padding: 5px 10px; min-width: 48px; }
+      .touch-panel button { width: 55px; height: 55px; font-size: 24px; }
+      .move-group { gap: 20px; padding: 8px 15px; }
+      .action-group { gap: 20px; padding: 8px 15px; margin-left: 35px; }
+      .top-buttons button { font-size: 11px; padding: 5px 8px; min-width: 45px; }
+      .volume-slider { width: 70px; }
+      .volume-icon { font-size: 16px; }
     }
   </style>
 </head>
 <body>
-<div class="audio-control" id="audioControl">
-  <div class="audio-icon" id="audioIcon">🔊</div>
-  <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
-  <div class="volume-value" id="volumeValue">50%</div>
+<!-- Верхняя панель с кнопками -->
+<div class="top-panel">
+  <div class="top-buttons">
+    <button id="btnPause" data-action="pause">⏸️ ПАУЗА</button>
+    <button id="btnStopEnemies" data-action="stopEnemies">⏹️ СТОП</button>
+    <button id="btnWeather" data-action="weather">🌦️ ПОГОДА</button>
+    <button id="btnMenu" data-action="menu">📜 МЕНЮ</button>
+  </div>
+  <!-- Регулятор громкости под кнопками -->
+  <div class="volume-control">
+    <div class="volume-icon" id="audioIcon">🔊</div>
+    <input type="range" id="volumeSlider" class="volume-slider" min="0" max="100" value="50">
+    <div class="volume-value" id="volumeValue">50%</div>
+  </div>
 </div>
 
-<div class="top-buttons">
-  <button id="btnPause" data-action="pause">⏸️ ПАУЗА</button>
-  <button id="btnStopEnemies" data-action="stopEnemies">⏹️ СТОП</button>
-  <button id="btnWeather" data-action="weather">🌦️ ПОГОДА</button>
-  <button id="btnMenu" data-action="menu">📜 МЕНЮ</button>
-</div>
-
+<!-- Нижние панели с кнопками: движение слева, прыжок/присед справа с отступом -->
 <div class="touch-panel">
-  <div class="left-group">
+  <div class="move-group">
     <button id="btnLeft" data-action="left">◀</button>
     <button id="btnRight" data-action="right">▶</button>
+  </div>
+  <div class="action-group">
     <button id="btnJump" data-action="jump">▲</button>
     <button id="btnCrouch" data-action="crouch">▼<span class="btn-label">присед</span></button>
   </div>
@@ -311,7 +367,6 @@ function create() {
       activateDoubleJumpBonus.call(this);
     }
     bonus.destroy();
-    this.cameras.main.flash(200, 255, 215, 0);
   });
 
   this.physics.add.collider(bonuses, this.ground, (bonus, ground) => {
@@ -319,7 +374,7 @@ function create() {
     bonus.body.setGravityY(0);
   });
 
-  // Столкновение с врагами - только нанесение урона, враги не уничтожаются
+  // Столкновение с врагами
   this.physics.add.overlap(player, enemies, (playerObj, enemy) => {
     if (isDead || isPaused || showMenu) return;
     if (isInvincible) return;
@@ -328,22 +383,16 @@ function create() {
     let hit = false;
     
     if (enemyType === 'low') {
-      if (player.body.blocked.down) {
-        hit = true;
-      }
+      if (player.body.blocked.down) hit = true;
     } else {
-      if (!isCrouching) {
-        hit = true;
-      }
+      if (!isCrouching) hit = true;
     }
     
     if (hit) {
       playerHit.call(this);
     }
-    // Враги НЕ уничтожаются, продолжают движение
   });
 
-  // Столкновение с золотыми/серебряными монстрами
   this.physics.add.overlap(player, specialEnemies, (playerObj, monster) => {
     if (isDead || isPaused || showMenu) return;
     if (isInvincible) return;
@@ -353,19 +402,14 @@ function create() {
     let hit = false;
     
     if (monsterHeight === 'low') {
-      if (player.body.blocked.down) {
-        hit = true;
-      }
+      if (player.body.blocked.down) hit = true;
     } else {
-      if (!isCrouching) {
-        hit = true;
-      }
+      if (!isCrouching) hit = true;
     }
     
     if (hit) {
       playerHit.call(this);
     }
-    // Монстры НЕ уничтожаются
   });
 
   bonusSpawnTimer = this.time.addEvent({
@@ -707,7 +751,6 @@ function playerHit() {
   lives--;
   updateHeartsDisplay.call(this);
   
-  // Включаем неуязвимость на 1.5 секунды
   isInvincible = true;
   player.setTint(0xff8888);
   
@@ -755,25 +798,20 @@ function initAudio() {
 }
 
 function setupAudioControls() {
-  const audioControl = document.getElementById('audioControl');
   const volumeSlider = document.getElementById('volumeSlider');
   const volumeValue = document.getElementById('volumeValue');
   const audioIcon = document.getElementById('audioIcon');
   if (volumeSlider && !volumeSlider.hasListener) {
-    volumeSlider.value = currentVolume * 100; volumeValue.textContent = Math.round(currentVolume * 100) + '%';
+    volumeSlider.value = currentVolume * 100;
+    volumeValue.textContent = Math.round(currentVolume * 100) + '%';
     volumeSlider.hasListener = true;
     volumeSlider.addEventListener('input', (e) => {
-      currentVolume = e.target.value / 100; volumeValue.textContent = e.target.value + '%';
+      currentVolume = e.target.value / 100;
+      volumeValue.textContent = e.target.value + '%';
       if (backgroundMusic) backgroundMusic.setVolume(currentVolume);
-      if (currentVolume === 0) { isMuted = true; audioIcon.textContent = '🔇'; } else { isMuted = false; audioIcon.textContent = '🔊'; }
+      if (currentVolume === 0) { isMuted = true; audioIcon.textContent = '🔇'; } 
+      else { isMuted = false; audioIcon.textContent = '🔊'; }
     });
-    audioControl.addEventListener('click', (e) => {
-      if (e.target !== volumeSlider) {
-        if (isMuted) { currentVolume = 0.5; volumeSlider.value = 50; volumeValue.textContent = '50%'; if (backgroundMusic) backgroundMusic.setVolume(0.5); audioIcon.textContent = '🔊'; isMuted = false; }
-        else { currentVolume = 0; volumeSlider.value = 0; volumeValue.textContent = '0%'; if (backgroundMusic) backgroundMusic.setVolume(0); audioIcon.textContent = '🔇'; isMuted = true; }
-      }
-    });
-    volumeSlider.addEventListener('click', (e) => e.stopPropagation());
   }
 }
 
