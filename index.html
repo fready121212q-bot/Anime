@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (NO FLICKERING)</title>
+  <title>Runner Game — Mobile Touch Controls (STABLE CROUCH)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -178,8 +178,9 @@ let touchRight = false;
 let jumpCooldown = false;
 let touchCrouchActive = false;
 
-// Для предотвращения мерцания - храним предыдущее состояние
-let wasCrouchingLastFrame = false;
+// Флаги для предотвращения мерцания
+let crouchRequested = false;
+let lastFrameCrouch = false;
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -226,7 +227,8 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
-  wasCrouchingLastFrame = false;
+  crouchRequested = false;
+  lastFrameCrouch = false;
 
   this.groundY = 320;
 
@@ -578,25 +580,27 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
+  // Надежная проверка на земле - используем touchedDown для стабильности
   const isOnGround = player.body.blocked.down;
   
-  // Проверяем нужно ли присесть (сенсор ИЛИ клавиша вниз)
+  // Проверяем нужно ли присесть - от сенсора ИЛИ от клавиатуры
   const downKeyPressed = this.cursors.down.isDown;
-  const shouldCrouch = (touchCrouchActive || downKeyPressed) && isOnGround;
+  const wantCrouch = (touchCrouchActive || downKeyPressed);
   
-  // Плавное переключение - меняем состояние только если оно отличается от текущего
-  if (shouldCrouch && !isCrouching) {
-    // Начинаем приседание
+  // Логика приседания с защитой от мерцания
+  if (wantCrouch && isOnGround && !isCrouching) {
+    // Приседаем
     isCrouching = true;
     player.body.setSize(55, 35, 1, 23);
     player.setTexture('crouch');
     player.stop();
     player.setVelocityX(0);
+    player.setVelocityY(0); // Фиксируем вертикальную скорость
     if (lastDirection === 'left') player.setFlipX(true);
     else player.setFlipX(false);
   } 
-  else if (!shouldCrouch && isCrouching) {
-    // Выходим из приседания
+  else if (!wantCrouch && isCrouching) {
+    // Встаем
     isCrouching = false;
     player.body.setSize(55, 58, 1, 2);
     player.setTexture('run1');
@@ -604,9 +608,10 @@ function update() {
     else player.setFlipX(false);
   }
   
-  // Если в приседе - блокируем движение
+  // Если в приседе - блокируем движение и выходим
   if (isCrouching) {
     player.setVelocityX(0);
+    // Удаляем врагов за экраном
     enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
     return;
   }
@@ -631,11 +636,15 @@ function update() {
     player.setFlipX(false);
   }
   
-  if (this.cursors.up.isDown && isOnGround && !isCrouching) {
+  // Прыжок
+  if (this.cursors.up.isDown && isOnGround && !isCrouching && !jumpCooldown) {
     player.setVelocityY(-260);
     moving = true;
+    jumpCooldown = true;
+    this.time.delayedCall(200, () => { jumpCooldown = false; });
   }
 
+  // Эффекты бега
   if (moving && isOnGround && !isCrouching) {
     if (dustParticles) {
       dustParticles.emitParticleAt(player.x - 15, player.y + 20);
@@ -648,15 +657,19 @@ function update() {
     }
   }
   
-  if (moving) {
+  // Анимация
+  if (moving && !isCrouching) {
     if (!player.anims.isPlaying) player.play('run');
   } else {
     if (player.anims.isPlaying) player.stop();
-    player.setTexture('run1');
-    if (lastDirection === 'left') player.setFlipX(true);
-    else player.setFlipX(false);
+    if (!isCrouching) {
+      player.setTexture('run1');
+      if (lastDirection === 'left') player.setFlipX(true);
+      else player.setFlipX(false);
+    }
   }
 
+  // Удаление врагов
   enemies.children.iterate(enemy => { if (enemy && enemy.x < -100) enemy.destroy(); });
 }
 </script>
