@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Controls (кнопки наверху)</title>
+  <title>Runner Game — Круговой таймер бонуса</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -36,7 +36,6 @@
     .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer; }
     .volume-value { color: white; font-size: 11px; min-width: 32px; }
 
-    /* Кнопки управления наверху */
     .top-buttons {
       position: fixed;
       top: 12px;
@@ -70,7 +69,6 @@
       background: rgba(100, 150, 220, 0.9);
     }
 
-    /* Нижние кнопки движения и прыжка */
     .touch-panel {
       position: fixed;
       bottom: 20px;
@@ -118,14 +116,6 @@
       border-radius: 100px;
       backdrop-filter: blur(4px);
     }
-    .right-group {
-      display: flex;
-      gap: 16px;
-      background: rgba(0,0,0,0.35);
-      padding: 10px 18px;
-      border-radius: 100px;
-      backdrop-filter: blur(4px);
-    }
     .btn-label {
       font-size: 10px;
       position: absolute;
@@ -140,12 +130,12 @@
     @media (max-width: 700px) {
       .touch-panel button { width: 60px; height: 60px; font-size: 24px; }
       .btn-label { font-size: 9px; bottom: -16px; }
-      .left-group, .right-group { padding: 6px 12px; gap: 12px; }
+      .left-group { padding: 6px 12px; gap: 12px; }
       .top-buttons button { font-size: 14px; padding: 6px 12px; min-width: 55px; }
     }
     @media (max-width: 550px) {
       .touch-panel button { width: 54px; height: 54px; font-size: 22px; }
-      .left-group, .right-group { gap: 10px; padding: 5px 10px; }
+      .left-group { gap: 10px; padding: 5px 10px; }
       .top-buttons button { font-size: 12px; padding: 5px 10px; min-width: 48px; }
     }
   </style>
@@ -157,7 +147,6 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
-<!-- Кнопки наверху: пауза, стоп врагов, погода -->
 <div class="top-buttons">
   <button id="btnPause" data-action="pause">⏸️ ПАУЗА</button>
   <button id="btnStopEnemies" data-action="stopEnemies">⏹️ СТОП</button>
@@ -165,7 +154,6 @@
   <button id="btnMenu" data-action="menu">📜 МЕНЮ</button>
 </div>
 
-<!-- Нижние кнопки: движение, прыжок, приседание -->
 <div class="touch-panel">
   <div class="left-group">
     <button id="btnLeft" data-action="left">◀</button>
@@ -203,6 +191,9 @@ let doubleJumpActive = false;
 let doubleJumpTimer = null;
 let bonusSpawnTimer = null;
 let canDoubleJump = false;
+let bonusTimerGraphic = null; // круговой таймер
+let bonusStartTime = 0;
+const BONUS_DURATION = 15000; // 15 секунд
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -346,7 +337,7 @@ function create() {
     monster.destroy();
   });
 
-  // Генерация бонусов
+  // Генерация бонусов (кроссовок уменьшен до scale 0.1)
   bonusSpawnTimer = this.time.addEvent({
     delay: 8000,
     loop: true,
@@ -356,8 +347,8 @@ function create() {
       if (Math.random() < 0.35) {
         const bonusX = Math.random() * 600 + 100;
         let bonus = bonuses.create(bonusX, 50, 'sneaker');
-        bonus.setScale(0.2);
-        bonus.body.setSize(25, 25, 8, 8);
+        bonus.setScale(0.1); // Уменьшен в 2 раза (было 0.2)
+        bonus.body.setSize(15, 15, 5, 5);
         bonus.body.setCollideWorldBounds(true);
         bonus.setBounce(0.2);
         bonus.setData('scored', false);
@@ -452,10 +443,78 @@ function create() {
   setupMobileControls.call(this);
 }
 
+function createBonusTimer() {
+  if (bonusTimerGraphic) bonusTimerGraphic.destroy();
+  
+  const radius = 35;
+  const x = player.x;
+  const y = player.y - 55;
+  
+  bonusTimerGraphic = this.add.graphics();
+  bonusTimerGraphic.setDepth(550);
+  bonusTimerGraphic.x = x;
+  bonusTimerGraphic.y = y;
+  
+  // Фон круга
+  bonusTimerGraphic.fillStyle(0x000000, 0.6);
+  bonusTimerGraphic.fillCircle(0, 0, radius + 2);
+  bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.8);
+  bonusTimerGraphic.strokeCircle(0, 0, radius);
+}
+
+function updateBonusTimer() {
+  if (!doubleJumpActive || !bonusTimerGraphic) {
+    if (bonusTimerGraphic) {
+      bonusTimerGraphic.destroy();
+      bonusTimerGraphic = null;
+    }
+    return;
+  }
+  
+  const elapsed = Date.now() - bonusStartTime;
+  const remaining = Math.max(0, BONUS_DURATION - elapsed);
+  const percent = remaining / BONUS_DURATION;
+  
+  if (remaining <= 0) {
+    if (bonusTimerGraphic) {
+      bonusTimerGraphic.destroy();
+      bonusTimerGraphic = null;
+    }
+    return;
+  }
+  
+  // Обновляем позицию таймера над игроком
+  bonusTimerGraphic.x = player.x;
+  bonusTimerGraphic.y = player.y - 55;
+  
+  // Перерисовываем дугу
+  bonusTimerGraphic.clear();
+  
+  // Фон
+  bonusTimerGraphic.fillStyle(0x000000, 0.6);
+  bonusTimerGraphic.fillCircle(0, 0, 37);
+  bonusTimerGraphic.lineStyle(2, 0xffaa44, 0.5);
+  bonusTimerGraphic.strokeCircle(0, 0, 35);
+  
+  // Убывающая дуга
+  const angle = 360 * percent;
+  bonusTimerGraphic.lineStyle(4, 0xffaa44, 1);
+  bonusTimerGraphic.beginPath();
+  bonusTimerGraphic.arc(0, 0, 32, 0, (angle * Math.PI) / 180, false);
+  bonusTimerGraphic.strokePath();
+  
+  // Маленький кружок в центре
+  bonusTimerGraphic.fillStyle(0xffaa44, 0.8);
+  bonusTimerGraphic.fillCircle(0, 0, 5);
+}
+
 function activateDoubleJumpBonus() {
   if (doubleJumpActive) return;
   doubleJumpActive = true;
   canDoubleJump = true;
+  bonusStartTime = Date.now();
+  
+  createBonusTimer.call(this);
   
   const activationEffect = this.add.circle(player.x, player.y, 30, 0xffaa44, 0.7);
   this.tweens.add({
@@ -484,9 +543,13 @@ function activateDoubleJumpBonus() {
   this.time.delayedCall(300, () => sparkEffect.destroy());
   
   if (doubleJumpTimer) doubleJumpTimer.remove();
-  doubleJumpTimer = this.time.delayedCall(15000, () => {
+  doubleJumpTimer = this.time.delayedCall(BONUS_DURATION, () => {
     doubleJumpActive = false;
     canDoubleJump = false;
+    if (bonusTimerGraphic) {
+      bonusTimerGraphic.destroy();
+      bonusTimerGraphic = null;
+    }
     this.cameras.main.flash(300, 255, 200, 0);
   }, [], this);
   
@@ -766,6 +829,11 @@ function update() {
   if (currentWeather === 'rain') {
     for (let i = 0; i < rainDrops.length; i++) { rainDrops[i].y += 8; if (rainDrops[i].y > 400) { rainDrops[i].y = -10; rainDrops[i].x = Math.random() * 800; } }
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
+  }
+
+  // Обновление кругового таймера
+  if (doubleJumpActive) {
+    updateBonusTimer.call(this);
   }
 
   if (doubleJumpActive && (this.cursors.left.isDown || this.cursors.right.isDown || touchLeft || touchRight) && player.body.blocked.down) {
