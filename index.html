@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Бонус: Кроссовк (эффекты)</title>
+  <title>Runner Game — Mobile Controls (кнопки наверху)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -36,6 +36,41 @@
     .volume-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: white; cursor: pointer; }
     .volume-value { color: white; font-size: 11px; min-width: 32px; }
 
+    /* Кнопки управления наверху */
+    .top-buttons {
+      position: fixed;
+      top: 12px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      z-index: 2000;
+      pointer-events: none;
+    }
+    .top-buttons button {
+      pointer-events: auto;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 40px;
+      color: white;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 8px 16px;
+      min-width: 70px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      transition: 0.07s linear;
+      touch-action: manipulation;
+      cursor: pointer;
+      font-family: monospace;
+    }
+    .top-buttons button:active {
+      transform: scale(0.95);
+      background: rgba(100, 150, 220, 0.9);
+    }
+
+    /* Нижние кнопки движения и прыжка */
     .touch-panel {
       position: fixed;
       bottom: 20px;
@@ -91,14 +126,6 @@
       border-radius: 100px;
       backdrop-filter: blur(4px);
     }
-    .center-group {
-      display: flex;
-      gap: 15px;
-      background: rgba(0,0,0,0.35);
-      padding: 8px 15px;
-      border-radius: 100px;
-      backdrop-filter: blur(4px);
-    }
     .btn-label {
       font-size: 10px;
       position: absolute;
@@ -113,11 +140,13 @@
     @media (max-width: 700px) {
       .touch-panel button { width: 60px; height: 60px; font-size: 24px; }
       .btn-label { font-size: 9px; bottom: -16px; }
-      .left-group, .right-group, .center-group { padding: 6px 12px; gap: 12px; }
+      .left-group, .right-group { padding: 6px 12px; gap: 12px; }
+      .top-buttons button { font-size: 14px; padding: 6px 12px; min-width: 55px; }
     }
     @media (max-width: 550px) {
       .touch-panel button { width: 54px; height: 54px; font-size: 22px; }
       .left-group, .right-group { gap: 10px; padding: 5px 10px; }
+      .top-buttons button { font-size: 12px; padding: 5px 10px; min-width: 48px; }
     }
   </style>
 </head>
@@ -128,20 +157,21 @@
   <div class="volume-value" id="volumeValue">50%</div>
 </div>
 
+<!-- Кнопки наверху: пауза, стоп врагов, погода -->
+<div class="top-buttons">
+  <button id="btnPause" data-action="pause">⏸️ ПАУЗА</button>
+  <button id="btnStopEnemies" data-action="stopEnemies">⏹️ СТОП</button>
+  <button id="btnWeather" data-action="weather">🌦️ ПОГОДА</button>
+  <button id="btnMenu" data-action="menu">📜 МЕНЮ</button>
+</div>
+
+<!-- Нижние кнопки: движение, прыжок, приседание -->
 <div class="touch-panel">
   <div class="left-group">
     <button id="btnLeft" data-action="left">◀</button>
     <button id="btnRight" data-action="right">▶</button>
     <button id="btnJump" data-action="jump">▲</button>
     <button id="btnCrouch" data-action="crouch">▼<span class="btn-label">присед</span></button>
-  </div>
-  <div class="center-group">
-    <button id="btnPause" data-action="pause">⏸️</button>
-    <button id="btnStopEnemies" data-action="stopEnemies">⏹️<span class="btn-label">стоп враг</span></button>
-    <button id="btnWeather" data-action="weather">🌦️<span class="btn-label">погода</span></button>
-  </div>
-  <div class="right-group">
-    <button id="btnMenu" data-action="menu">📜<span class="btn-label">меню</span></button>
   </div>
 </div>
 
@@ -173,10 +203,6 @@ let doubleJumpActive = false;
 let doubleJumpTimer = null;
 let bonusSpawnTimer = null;
 let canDoubleJump = false;
-
-// Эффекты
-let bonusEffectTimer = null;
-let speedLines = [];
 
 let rainDrops = [];
 let rainStreaks = [];
@@ -242,7 +268,6 @@ function create() {
   touchCrouchActive = false;
   doubleJumpActive = false;
   canDoubleJump = false;
-  speedLines = [];
 
   this.groundY = 320;
 
@@ -427,32 +452,11 @@ function create() {
   setupMobileControls.call(this);
 }
 
-function createSpeedLines() {
-  if (!doubleJumpActive) return;
-  for (let i = 0; i < 8; i++) {
-    const line = this.add.rectangle(Math.random() * 800, Math.random() * 400, 2, Math.random() * 30 + 10, 0xffaa44, 0.6);
-    line.setDepth(400);
-    speedLines.push(line);
-    this.tweens.add({
-      targets: line,
-      x: line.x - 400,
-      alpha: 0,
-      duration: 800,
-      onComplete: () => {
-        line.destroy();
-        const index = speedLines.indexOf(line);
-        if (index > -1) speedLines.splice(index, 1);
-      }
-    });
-  }
-}
-
 function activateDoubleJumpBonus() {
   if (doubleJumpActive) return;
   doubleJumpActive = true;
   canDoubleJump = true;
   
-  // Эффект активации бонуса
   const activationEffect = this.add.circle(player.x, player.y, 30, 0xffaa44, 0.7);
   this.tweens.add({
     targets: activationEffect,
@@ -462,7 +466,6 @@ function activateDoubleJumpBonus() {
     onComplete: () => activationEffect.destroy()
   });
   
-  // Эффект искр вокруг персонажа
   const sparkEffect = this.add.particles(player.x, player.y, null, {
     speed: { min: 100, max: 250 },
     angle: { min: 0, max: 360 },
@@ -716,8 +719,6 @@ function setupMobileControls() {
       jumpCooldown = true;
       canDoubleJump = false;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
-      
-      // Эффект двойного прыжка
       for (let i = 0; i < 8; i++) {
         const trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7);
         this.tweens.add({
@@ -756,7 +757,7 @@ function setupMobileControls() {
 function update() {
   if (showMenu) {
     menuText.setVisible(true);
-    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n\n📱 СЕНСОРНЫЕ КНОПКИ ВНИЗУ');
+    menuText.setText('========== МЕНЮ ==========\n\nУПРАВЛЕНИЕ:\n← → - движение\n↑ - ПРЫЖОК / ДВОЙНОЙ ПРЫЖОК\n↓ - ПРИСЕДАНИЕ\nSPACE - пауза\nQ - стоп врагов\nW - смена погоды\nESC - закрыть меню\n\nПРАВИЛА:\n✅ Уклонился от врага +1 очко\n❤️ 3 жизни\n👟 Кроссовок - двойной прыжок 15 сек!\n\n📱 КНОПКИ ВВЕРХУ И ВНИЗУ');
     return;
   } else menuText.setVisible(false);
 
@@ -767,7 +768,6 @@ function update() {
     for (let i = 0; i < rainStreaks.length; i++) { rainStreaks[i].y += 12; if (rainStreaks[i].y > 400) { rainStreaks[i].y = -20; rainStreaks[i].x = Math.random() * 800; } }
   }
 
-  // Эффект скорости при активном бонусе и беге
   if (doubleJumpActive && (this.cursors.left.isDown || this.cursors.right.isDown || touchLeft || touchRight) && player.body.blocked.down) {
     if (Math.random() < 0.1) {
       const spark = this.add.circle(player.x + (lastDirection === 'right' ? -15 : 15), player.y + 15, 2, 0xffaa44, 0.8);
@@ -781,7 +781,6 @@ function update() {
     }
   }
 
-  // Сброс canDoubleJump при касании земли
   if (player.body.blocked.down) {
     canDoubleJump = doubleJumpActive;
   }
@@ -861,8 +860,6 @@ function update() {
       moving = true;
       canDoubleJump = false;
       this.time.delayedCall(200, () => { jumpCooldown = false; });
-      
-      // Эффект двойного прыжка
       for (let i = 0; i < 8; i++) {
         const trail = this.add.circle(player.x, player.y, 3, 0xffaa44, 0.7);
         this.tweens.add({
