@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Runner Game — Mobile Touch Controls (AIR CROUCH FIXED)</title>
+  <title>Runner Game — Mobile Touch Controls (KEYBOARD CROUCH FIXED)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/phaser/3.80.1/phaser.min.js"></script>
   <style>
     * {
@@ -176,7 +176,9 @@ let footprintDelay = 0;
 let touchLeft = false;
 let touchRight = false;
 let jumpCooldown = false;
-let touchCrouchActive = false; // Флаг что кнопка приседания зажата
+let touchCrouchActive = false;
+let keyboardCrouchActive = false; // отдельный флаг для клавиатуры
+let lastCrouchState = false; // для предотвращения мерцания
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -223,6 +225,7 @@ function create() {
   touchLeft = false;
   touchRight = false;
   touchCrouchActive = false;
+  keyboardCrouchActive = false;
 
   this.groundY = 320;
 
@@ -508,7 +511,6 @@ function setupMobileControls() {
   btnJump.addEventListener('click', (e) => { e.preventDefault(); doJump(); });
   btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); doJump(); });
 
-  // ПРИСЕДАНИЕ - просто устанавливаем флаг, всю логику делает update
   btnCrouch.addEventListener('touchstart', (e) => { 
     e.preventDefault(); 
     touchCrouchActive = true;
@@ -561,7 +563,6 @@ function setupMobileControls() {
   btnMenu.addEventListener('touchstart', (e) => { e.preventDefault(); if (isDead) return; toggleMenu.call(this); });
 }
 
-// Функция для применения приседания
 function applyCrouch() {
   if (!player || !player.body) return;
   if (!isCrouching && !isDead && !isPaused && !showMenu) {
@@ -575,7 +576,6 @@ function applyCrouch() {
   }
 }
 
-// Функция для отмены приседания
 function releaseCrouch() {
   if (isCrouching) {
     isCrouching = false;
@@ -602,21 +602,20 @@ function update() {
 
   const isOnGround = player.body.blocked.down;
   
-  // ГЛАВНАЯ ЛОГИКА: если кнопка приседания зажата И игрок на земле -> приседаем
-  // Это работает и когда кнопка была зажата в воздухе - при касании земли сразу сработает
-  if (touchCrouchActive && isOnGround && !isCrouching) {
-    applyCrouch();
-  }
-  
-  // Если кнопка приседания НЕ зажата И игрок в приседе -> встаём
-  if (!touchCrouchActive && isCrouching) {
-    releaseCrouch();
-  }
-  
-  // КЛАВИАТУРНОЕ ПРИСЕДАНИЕ (стрелка вниз) - работает независимо
+  // Обработка клавиатурного приседания (отдельно от сенсора)
   const downKeyPressed = this.cursors.down.isDown;
-  if (downKeyPressed && isOnGround && !isCrouching && !touchCrouchActive) {
+  
+  // Обновляем флаг клавиатуры
+  keyboardCrouchActive = downKeyPressed;
+  
+  // Проверяем нужно ли присесть (сенсор ИЛИ клавиатура)
+  const shouldBeCrouching = (touchCrouchActive || keyboardCrouchActive) && isOnGround;
+  
+  // Плавное переключение без мерцания
+  if (shouldBeCrouching && !isCrouching) {
     applyCrouch();
+  } else if (!shouldBeCrouching && isCrouching) {
+    releaseCrouch();
   }
   
   // Если в приседе - блокируем движение
